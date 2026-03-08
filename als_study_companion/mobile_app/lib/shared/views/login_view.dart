@@ -11,8 +11,14 @@ import 'teacher_pending_approval_view.dart';
 
 /// Login view with Supabase Authentication.
 /// Routes to appropriate dashboard based on user role.
+///
+/// [preselectedRole] is supplied by [RoleSelectionView] so that the
+/// sign-in / register flow already knows whether this is a Student or Teacher,
+/// removing the need for the role-picker bottom sheets.
 class LoginView extends StatefulWidget {
-  const LoginView({super.key});
+  final UserRole? preselectedRole;
+
+  const LoginView({super.key, this.preselectedRole});
 
   @override
   State<LoginView> createState() => _LoginViewState();
@@ -61,9 +67,9 @@ class _LoginViewState extends State<LoginView> {
   }
 
   Future<void> _handleGoogleSignIn() async {
-    // Ask the user whether they are a student or teacher before triggering
-    // Google sign-in so we can set the correct role on first sign-up.
-    final role = await _showRolePicker();
+    // If a role was pre-selected (via RoleSelectionView) use it directly;
+    // otherwise ask the user with the bottom sheet.
+    final role = widget.preselectedRole ?? await _showRolePicker();
     if (role == null || !mounted) return;
 
     setState(() => _isLoading = true);
@@ -201,9 +207,25 @@ class _LoginViewState extends State<LoginView> {
     _navigateToDashboard(authVm.currentRole!);
   }
 
-  /// Shows a bottom sheet to pick Student or Teacher, then navigates
-  /// to the corresponding registration screen.
+  /// Navigates to the registration screen.
+  /// If [preselectedRole] is set (coming from RoleSelectionView) it goes
+  /// directly to the matching screen; otherwise shows the role-picker sheet.
   void _showRegisterRolePicker() {
+    final role = widget.preselectedRole;
+    if (role == UserRole.student) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const StudentRegistrationView()),
+      );
+      return;
+    }
+    if (role == UserRole.teacher) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const TeacherRegistrationView()),
+      );
+      return;
+    }
+
+    // No pre-selection — ask the user.
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -280,7 +302,11 @@ class _LoginViewState extends State<LoginView> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Sign in to continue learning',
+                    widget.preselectedRole == UserRole.student
+                        ? 'Sign in as a Student'
+                        : widget.preselectedRole == UserRole.teacher
+                        ? 'Sign in as a Teacher'
+                        : 'Sign in to continue learning',
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 48),

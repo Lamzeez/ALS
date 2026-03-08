@@ -19,7 +19,7 @@ import 'teacher/viewmodels/quiz_creator_viewmodel.dart';
 import 'teacher/viewmodels/student_monitor_viewmodel.dart';
 import 'teacher/viewmodels/session_viewmodel.dart';
 import 'teacher/viewmodels/announcement_viewmodel.dart';
-import 'shared/views/login_view.dart';
+import 'shared/views/role_selection_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,7 +107,7 @@ class ALSStudyCompanionApp extends StatelessWidget {
           useMaterial3: true,
           appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
         ),
-        home: const LoginView(),
+        home: const RoleSelectionView(),
       ),
     );
   }
