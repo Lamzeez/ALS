@@ -6,6 +6,7 @@ import 'viewmodels/user_management_viewmodel.dart';
 import 'viewmodels/content_management_viewmodel.dart';
 import 'viewmodels/analytics_viewmodel.dart';
 import 'viewmodels/center_management_viewmodel.dart';
+import 'admin_login_page.dart';
 import 'dashboard/admin_shell.dart';
 
 void main() async {
@@ -44,7 +45,10 @@ class AdminWebApp extends StatelessWidget {
           ),
           useMaterial3: true,
         ),
-        home: const AdminShell(),
+        home: Consumer<AdminAuthViewModel>(
+          builder: (context, auth, child) =>
+              auth.isAuthenticated ? const AdminShell() : const AdminLoginPage(),
+        ),
       ),
     );
   }

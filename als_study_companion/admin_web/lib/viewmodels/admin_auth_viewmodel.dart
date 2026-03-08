@@ -7,6 +7,12 @@ class AdminAuthViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  AdminAuthViewModel() {
+    // Restore existing session if the user was already signed in.
+    _isAuthenticated =
+        Supabase.instance.client.auth.currentUser != null;
+  }
+
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;

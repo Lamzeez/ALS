@@ -58,11 +58,43 @@ class ContentManagementViewModel extends ChangeNotifier {
     try {
       await Supabase.instance.client
           .from('lessons')
-          .update({'is_published': publish ? 1 : 0})
+          .update({'is_published': publish})
           .eq('id', lessonId);
       final index = _lessons.indexWhere((l) => l.id == lessonId);
       if (index >= 0) {
         _lessons[index] = _lessons[index].copyWith(isPublished: publish);
+        notifyListeners();
+      }
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteQuiz(String id) async {
+    try {
+      await Supabase.instance.client.from('quizzes').delete().eq('id', id);
+      _quizzes.removeWhere((q) => q.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> toggleQuizPublish(String quizId, bool publish) async {
+    try {
+      await Supabase.instance.client
+          .from('quizzes')
+          .update({'is_published': publish})
+          .eq('id', quizId);
+      final index = _quizzes.indexWhere((q) => q.id == quizId);
+      if (index >= 0) {
+        _quizzes[index] = _quizzes[index].copyWith(isPublished: publish);
         notifyListeners();
       }
       return true;

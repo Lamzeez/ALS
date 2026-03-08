@@ -45,7 +45,7 @@ class AnalyticsViewModel extends ChangeNotifier {
       _totalStudents = users.where((u) => u['role'] == 'student').length;
       _totalTeachers = users.where((u) => u['role'] == 'teacher').length;
       _activeUsers = users
-          .where((u) => u['isActive'] == true || u['isActive'] == 1)
+          .where((u) => u['is_active'] == true || u['is_active'] == 1)
           .length;
       _pendingTeachers = users
           .where(

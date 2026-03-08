@@ -243,7 +243,7 @@ class UserManagementViewModel extends ChangeNotifier {
       await Supabase.instance.client.from('audit_logs').insert({
         'action': action,
         'target_user_id': targetId,
-        'detail': detail,
+        'details': detail,
         'performed_by': Supabase.instance.client.auth.currentUser?.id,
         'created_at': DateTime.now().toIso8601String(),
       });

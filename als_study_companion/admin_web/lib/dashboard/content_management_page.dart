@@ -303,6 +303,7 @@ class _QuizzesTab extends StatelessWidget {
           DataColumn(label: Text('Time Limit')),
           DataColumn(label: Text('Passing Score')),
           DataColumn(label: Text('Published')),
+          DataColumn(label: Text('Actions')),
         ],
         rows: filtered.map((quiz) {
           return DataRow(
@@ -312,15 +313,55 @@ class _QuizzesTab extends StatelessWidget {
               DataCell(Text('${quiz.timeLimitMinutes} min')),
               DataCell(Text('${quiz.passingScore}%')),
               DataCell(
-                Icon(
-                  quiz.isPublished ? Icons.check_circle : Icons.pending,
-                  color: quiz.isPublished ? Colors.green : Colors.orange,
-                  size: 20,
+                Switch(
+                  value: quiz.isPublished,
+                  onChanged: (val) => vm.toggleQuizPublish(quiz.id, val),
+                ),
+              ),
+              DataCell(
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                  tooltip: 'Delete',
+                  onPressed: () => _confirmDeleteQuiz(
+                    context,
+                    vm,
+                    quiz.id,
+                    quiz.title,
+                  ),
                 ),
               ),
             ],
           );
         }).toList(),
+      ),
+    );
+  }
+
+  void _confirmDeleteQuiz(
+    BuildContext context,
+    ContentManagementViewModel vm,
+    String id,
+    String title,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Quiz'),
+        content: Text('Delete "$title"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              vm.deleteQuiz(id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

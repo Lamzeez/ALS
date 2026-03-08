@@ -22,13 +22,42 @@ class _UserManagementPageState extends State<UserManagementPage>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserManagementViewModel>().loadUsers();
-      context.read<UserManagementViewModel>().loadAuditLogs();
+      final vm = context.read<UserManagementViewModel>();
+      vm.loadUsers();
+      vm.loadAuditLogs();
+      vm.addListener(_onVmChanged);
+    });
+  }
+
+  void _onVmChanged() {
+    final vm = context.read<UserManagementViewModel>();
+    final error = vm.errorMessage;
+    final success = vm.successMessage;
+    if (error == null && success == null) return;
+    vm.clearMessages();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      } else if (success != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success),
+            backgroundColor: Colors.green[700],
+          ),
+        );
+      }
     });
   }
 
   @override
   void dispose() {
+    context.read<UserManagementViewModel>().removeListener(_onVmChanged);
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
