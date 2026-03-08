@@ -322,12 +322,8 @@ class _QuizzesTab extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.delete, size: 20, color: Colors.red),
                   tooltip: 'Delete',
-                  onPressed: () => _confirmDeleteQuiz(
-                    context,
-                    vm,
-                    quiz.id,
-                    quiz.title,
-                  ),
+                  onPressed: () =>
+                      _confirmDeleteQuiz(context, vm, quiz.id, quiz.title),
                 ),
               ),
             ],

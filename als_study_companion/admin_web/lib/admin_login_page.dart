@@ -85,10 +85,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (v) =>
-                          (v == null || !v.contains('@'))
-                              ? 'Enter a valid email address'
-                              : null,
+                      validator: (v) => (v == null || !v.contains('@'))
+                          ? 'Enter a valid email address'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -102,16 +101,20 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscure
-                                ? Icons.visibility_off
-                                : Icons.visibility,
+                            _obscure ? Icons.visibility_off : Icons.visibility,
                           ),
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Enter your password' : null,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return 'Enter your password';
+                        }
+                        if (v.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 24),
                     Consumer<AdminAuthViewModel>(

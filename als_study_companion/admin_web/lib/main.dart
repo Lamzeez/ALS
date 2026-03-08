@@ -46,8 +46,9 @@ class AdminWebApp extends StatelessWidget {
           useMaterial3: true,
         ),
         home: Consumer<AdminAuthViewModel>(
-          builder: (context, auth, child) =>
-              auth.isAuthenticated ? const AdminShell() : const AdminLoginPage(),
+          builder: (context, auth, child) => auth.isAuthenticated
+              ? const AdminShell()
+              : const AdminLoginPage(),
         ),
       ),
     );

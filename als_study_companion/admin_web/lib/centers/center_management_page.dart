@@ -194,9 +194,7 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                                         ),
                                       ),
                                     ),
-                                    DataCell(
-                                      Text(center.contactNumber ?? '—'),
-                                    ),
+                                    DataCell(Text(center.contactNumber ?? '—')),
                                     DataCell(
                                       Chip(
                                         label: Text(
@@ -231,8 +229,7 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                                               size: 20,
                                             ),
                                             tooltip: 'Edit',
-                                            onPressed: () =>
-                                                _showCenterDialog(
+                                            onPressed: () => _showCenterDialog(
                                               context,
                                               vm,
                                               center: center,
@@ -245,8 +242,7 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                                               color: Colors.red,
                                             ),
                                             tooltip: 'Delete',
-                                            onPressed: () =>
-                                                _confirmDelete(
+                                            onPressed: () => _confirmDelete(
                                               context,
                                               vm,
                                               center,
@@ -306,10 +302,9 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                         labelText: 'Center Name *',
                         border: OutlineInputBorder(),
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty)
-                              ? 'Center name is required'
-                              : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Center name is required'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -319,10 +314,9 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                         border: OutlineInputBorder(),
                         hintText: 'e.g. Region VII',
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty)
-                              ? 'Region is required'
-                              : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Region is required'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -332,10 +326,9 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                         labelText: 'Address *',
                         border: OutlineInputBorder(),
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty)
-                              ? 'Address is required'
-                              : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Address is required'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -348,7 +341,9 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                     const SizedBox(height: 8),
                     SwitchListTile(
                       title: const Text('Active'),
-                      subtitle: const Text('Inactive centers are hidden from users'),
+                      subtitle: const Text(
+                        'Inactive centers are hidden from users',
+                      ),
                       value: isActive,
                       onChanged: (v) => setDialogState(() => isActive = v),
                     ),
@@ -367,7 +362,8 @@ class _CenterManagementPageState extends State<CenterManagementPage> {
                 if (!formKey.currentState!.validate()) return;
                 final now = DateTime.now();
                 final model = AlsCenterModel(
-                  id: center?.id ??
+                  id:
+                      center?.id ??
                       DateTime.now().microsecondsSinceEpoch.toString(),
                   name: nameCtrl.text.trim(),
                   region: regionCtrl.text.trim(),
@@ -486,4 +482,3 @@ class _StatChip extends StatelessWidget {
     );
   }
 }
-

@@ -143,8 +143,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         child: Text(
                           'No recent admin activity recorded.',
                           textAlign: TextAlign.center,
-                          style:
-                              TextStyle(color: Colors.grey[500], fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -155,13 +157,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: analyticsVm.recentActivity.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 1),
                       itemBuilder: (context, i) {
                         final log = analyticsVm.recentActivity[i];
                         return ListTile(
                           dense: true,
-                          leading:
-                              const Icon(Icons.history, size: 20),
+                          leading: const Icon(Icons.history, size: 20),
                           title: Text(
                             log['action'] as String? ?? '',
                             style: const TextStyle(fontSize: 14),

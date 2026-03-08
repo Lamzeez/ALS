@@ -40,7 +40,7 @@ class AnalyticsViewModel extends ChangeNotifier {
       // Fetch user counts by role
       final usersRes = await client
           .from('users')
-          .select('role, teacher_verified');
+          .select('role, teacher_verified, is_active');
       final users = List<Map<String, dynamic>>.from(usersRes as List);
       _totalStudents = users.where((u) => u['role'] == 'student').length;
       _totalTeachers = users.where((u) => u['role'] == 'teacher').length;

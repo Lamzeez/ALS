@@ -8,9 +8,17 @@ class AdminAuthViewModel extends ChangeNotifier {
   String? _errorMessage;
 
   AdminAuthViewModel() {
-    // Restore existing session if the user was already signed in.
-    _isAuthenticated =
-        Supabase.instance.client.auth.currentUser != null;
+    // Restore existing session synchronously if available.
+    _isAuthenticated = Supabase.instance.client.auth.currentUser != null;
+
+    // Listen for auth state changes (token refresh, sign-out from another tab).
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final newAuth = data.session != null;
+      if (newAuth != _isAuthenticated) {
+        _isAuthenticated = newAuth;
+        notifyListeners();
+      }
+    });
   }
 
   bool get isAuthenticated => _isAuthenticated;

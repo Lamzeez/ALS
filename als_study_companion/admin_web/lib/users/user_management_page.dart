@@ -39,17 +39,11 @@ class _UserManagementPageState extends State<UserManagementPage>
       if (!mounted) return;
       if (error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: Colors.red[700],
-          ),
+          SnackBar(content: Text(error), backgroundColor: Colors.red[700]),
         );
       } else if (success != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success),
-            backgroundColor: Colors.green[700],
-          ),
+          SnackBar(content: Text(success), backgroundColor: Colors.green[700]),
         );
       }
     });
@@ -485,7 +479,7 @@ class _UserManagementPageState extends State<UserManagementPage>
           child: ListTile(
             leading: const Icon(Icons.history),
             title: Text(log['action']?.toString() ?? ''),
-            subtitle: Text(log['detail']?.toString() ?? ''),
+            subtitle: Text(log['details']?.toString() ?? ''),
             trailing: Text(
               log['created_at']?.toString().substring(0, 16) ?? '',
               style: TextStyle(color: Colors.grey[500], fontSize: 12),
