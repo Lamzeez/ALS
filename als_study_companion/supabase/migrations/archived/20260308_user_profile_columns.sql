@@ -1,3 +1,9 @@
+-- ARCHIVED on 2026-03-09: superseded by 20260311_fix_schema_and_policies.sql
+-- Original: als_study_companion/supabase/migrations/20260308_user_profile_columns.sql
+-- This migration was made idempotent and then archived to avoid applying
+-- redundant/overlapping schema changes. The authoritative fixes live
+-- in the 20260311_* migrations.
+
 -- Add student-specific and teacher-specific profile columns to the users table.
 
 ALTER TABLE public.users

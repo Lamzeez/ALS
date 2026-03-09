@@ -432,15 +432,42 @@ class AuthViewModel extends ChangeNotifier {
 
   /// Format error messages to be user-friendly
   String _formatErrorMessage(String error) {
-    if (error.contains('Invalid login credentials')) {
+    if (error.contains('Invalid login credentials') ||
+        error.contains('invalid_credentials')) {
       return 'Invalid email or password';
-    } else if (error.contains('Email not confirmed')) {
-      return 'Please verify your email address';
-    } else if (error.contains('User already registered')) {
+    } else if (error.contains('Email not confirmed') ||
+        error.contains('email_not_confirmed')) {
+      return 'Please verify your email address before signing in';
+    } else if (error.contains('User already registered') ||
+        error.contains('already registered') ||
+        error.contains('already been registered')) {
       return 'An account with this email already exists';
-    } else if (error.contains('Password should be at least')) {
+    } else if (error.contains('Password should be at least') ||
+        error.contains('password') && error.contains('characters')) {
       return 'Password must be at least 8 characters';
+    } else if (error.contains('network_error') ||
+        error.contains('ApiException: 7')) {
+      return 'Network error during Google Sign-In. '
+          'Ensure the app is registered in Google Cloud Console '
+          'with the correct SHA-1 fingerprint.';
+    } else if (error.contains('Google Sign-In is not configured')) {
+      return 'Google Sign-In is not set up. Contact the app administrator.';
+    } else if (error.contains('no ID token')) {
+      return 'Google Sign-In failed: could not obtain authentication token.';
+    } else if (error.contains('Full name must be at least')) {
+      return 'Please enter your full name (at least 2 characters).';
+    } else if (error.contains('Invalid email format')) {
+      return 'The email address format is invalid.';
+    } else if (error.contains('row-level security') ||
+        error.contains('violates row-level')) {
+      return 'Account creation failed due to a permissions error. '
+          'Please try again or contact support.';
     }
+    // Surface the raw message in debug builds so developers see the real error.
+    assert(() {
+      debugPrint('[AuthViewModel] Unhandled error: $error');
+      return true;
+    }());
     return 'An error occurred. Please try again.';
   }
 
