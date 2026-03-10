@@ -20,9 +20,17 @@ class TeacherLessonViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _lessons = await _repository.getLessonsByTeacher(teacherId);
+      // Try remote first, fallback to local
+      final remote = await _repository.fetchRemoteLessons(teacherId);
+      _lessons = remote.isNotEmpty
+          ? remote
+          : await _repository.getLessonsByTeacher(teacherId);
     } catch (e) {
-      _errorMessage = 'Failed to load lessons: ${e.toString()}';
+      try {
+        _lessons = await _repository.getLessonsByTeacher(teacherId);
+      } catch (_) {
+        _errorMessage = 'Failed to load lessons: ${e.toString()}';
+      }
     }
 
     _isLoading = false;
@@ -32,6 +40,7 @@ class TeacherLessonViewModel extends ChangeNotifier {
   Future<bool> createLesson(LessonModel lesson) async {
     try {
       await _repository.createLesson(lesson);
+      _repository.pushLesson(lesson); // push to remote (fire-and-forget)
       _lessons.insert(0, lesson);
       notifyListeners();
       return true;
@@ -45,6 +54,7 @@ class TeacherLessonViewModel extends ChangeNotifier {
   Future<bool> updateLesson(LessonModel lesson) async {
     try {
       await _repository.updateLesson(lesson);
+      _repository.pushLesson(lesson); // push to remote (fire-and-forget)
       final index = _lessons.indexWhere((l) => l.id == lesson.id);
       if (index >= 0) {
         _lessons[index] = lesson;

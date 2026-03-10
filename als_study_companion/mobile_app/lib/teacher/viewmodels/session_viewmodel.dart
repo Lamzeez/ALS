@@ -22,10 +22,21 @@ class SessionViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _sessions = await _repository.getSessionsByTeacher(teacherId);
+      // Try remote first, fallback to local
+      final remote = await _repository.fetchRemoteSessions(teacherId);
+      if (remote.isNotEmpty) {
+        _sessions = remote;
+      } else {
+        _sessions = await _repository.getSessionsByTeacher(teacherId);
+      }
       _upcomingSessions = await _repository.getUpcomingSessions(teacherId);
     } catch (e) {
-      _errorMessage = 'Failed to load sessions: ${e.toString()}';
+      try {
+        _sessions = await _repository.getSessionsByTeacher(teacherId);
+        _upcomingSessions = await _repository.getUpcomingSessions(teacherId);
+      } catch (_) {
+        _errorMessage = 'Failed to load sessions: ${e.toString()}';
+      }
     }
 
     _isLoading = false;
@@ -35,6 +46,7 @@ class SessionViewModel extends ChangeNotifier {
   Future<bool> createSession(SessionModel session) async {
     try {
       await _repository.createSession(session);
+      _repository.pushSession(session); // push to remote (fire-and-forget)
       _sessions.insert(0, session);
       _upcomingSessions =
           _sessions

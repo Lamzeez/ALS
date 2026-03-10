@@ -24,9 +24,9 @@ class SyncService {
   static const Duration _baseDelay = Duration(seconds: 2);
 
   SyncService({
-    required SupabaseDatabaseService firestoreService,
+    required SupabaseDatabaseService databaseService,
     Connectivity? connectivity,
-  }) : _databaseService = firestoreService,
+  }) : _databaseService = databaseService,
        _connectivity = connectivity ?? Connectivity();
 
   /// Check if the device currently has internet connectivity.

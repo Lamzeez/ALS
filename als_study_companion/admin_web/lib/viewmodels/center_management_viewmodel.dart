@@ -20,7 +20,7 @@ class CenterManagementViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await Supabase.instance.client.from('centers').select();
+      final res = await Supabase.instance.client.from('als_centers').select();
       final items = List<Map<String, dynamic>>.from(res as List);
       _centers = items.map((m) => AlsCenterModel.fromMap(m)).toList();
     } catch (e) {
@@ -33,7 +33,7 @@ class CenterManagementViewModel extends ChangeNotifier {
 
   Future<bool> createCenter(AlsCenterModel center) async {
     try {
-      await Supabase.instance.client.from('centers').upsert(center.toMap());
+      await Supabase.instance.client.from('als_centers').upsert(center.toMap());
       _centers.add(center);
       notifyListeners();
       return true;
@@ -46,7 +46,7 @@ class CenterManagementViewModel extends ChangeNotifier {
 
   Future<bool> updateCenter(AlsCenterModel center) async {
     try {
-      await Supabase.instance.client.from('centers').upsert(center.toMap());
+      await Supabase.instance.client.from('als_centers').upsert(center.toMap());
       final index = _centers.indexWhere((c) => c.id == center.id);
       if (index >= 0) {
         _centers[index] = center;
@@ -62,7 +62,7 @@ class CenterManagementViewModel extends ChangeNotifier {
 
   Future<bool> deleteCenter(String id) async {
     try {
-      await Supabase.instance.client.from('centers').delete().eq('id', id);
+      await Supabase.instance.client.from('als_centers').delete().eq('id', id);
       _centers.removeWhere((c) => c.id == id);
       notifyListeners();
       return true;
