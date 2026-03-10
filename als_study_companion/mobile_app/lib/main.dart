@@ -68,7 +68,11 @@ class ALSStudyCompanionApp extends StatelessWidget {
           create: (_) => LocalDatabase(),
           dispose: (_, db) => db.close(),
         ),
-        Provider<SupabaseAuthService>(create: (_) => SupabaseAuthService()),
+        Provider<SupabaseAuthService>(
+          create: (_) => SupabaseAuthService(
+            googleWebClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
+          ),
+        ),
         Provider<BiometricService>(create: (_) => BiometricService()),
         Provider<SecureCredentialStorage>(
           create: (_) => SecureCredentialStorage(),

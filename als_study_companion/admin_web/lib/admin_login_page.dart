@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 import 'viewmodels/admin_auth_viewmodel.dart';
 
 /// Admin login page — shown whenever the user is not authenticated.
@@ -15,6 +16,17 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill credentials in debug mode to help local development and testing.
+    // These values are for development only — never commit real credentials.
+    if (kDebugMode) {
+      _emailCtrl.text = 'bondavemonton09@gmail.com';
+      _passwordCtrl.text = 'Admin@123';
+    }
+  }
 
   @override
   void dispose() {

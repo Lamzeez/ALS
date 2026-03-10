@@ -8,8 +8,13 @@ import 'package:google_sign_in/google_sign_in.dart';
 class SupabaseAuthService {
   final SupabaseClient _client;
 
-  SupabaseAuthService({SupabaseClient? client})
-    : _client = client ?? Supabase.instance.client;
+  /// Web OAuth client ID for Google Sign-In (from GOOGLE_WEB_CLIENT_ID in .env).
+  /// Required to obtain an ID token on Android/iOS.
+  final String? _googleWebClientId;
+
+  SupabaseAuthService({SupabaseClient? client, String? googleWebClientId})
+    : _client = client ?? Supabase.instance.client,
+      _googleWebClientId = googleWebClientId;
 
   /// Current Supabase user.
   User? get currentUser => _client.auth.currentUser;
@@ -38,8 +43,12 @@ class SupabaseAuthService {
 
   /// Register a new student account.
   ///
-  /// Creates a Supabase Auth account (which triggers a confirmation email),
-  /// then saves the full student profile to the Supabase `users` table.
+  /// Passes all profile fields as [data] (user_metadata) so the
+  /// `handle_new_auth_user` database trigger can create the full profile
+  /// server-side — even when email confirmation is enabled and the client
+  /// has no active session after sign-up.
+  /// If a session IS available immediately (email confirmation disabled),
+  /// the client also upserts the row to populate any additional fields.
   Future<UserModel> registerStudent({
     required String email,
     required String password,
@@ -54,17 +63,13 @@ class SupabaseAuthService {
     String? lastYearAttended,
     String? alsCenterId,
   }) async {
-    // 1. Create Supabase Auth account (sends confirmation email automatically
-    //    when "Email Confirmations" is enabled in the Supabase dashboard).
-    final res = await _client.auth.signUp(email: email, password: password);
-    if (res.user == null) throw Exception('Supabase account creation failed.');
-
-    // 2. Save full profile to Supabase `users` table
     final now = DateTime.now();
+    final fullName = '$firstName $lastName';
+
     final userMap = {
-      'id': res.user!.id,
+      'id': '', // filled in after signUp
       'email': email,
-      'full_name': '$firstName $lastName',
+      'full_name': fullName,
       'role': UserRole.student.name,
       'als_center_id': alsCenterId,
       'is_active': true,
@@ -82,15 +87,54 @@ class SupabaseAuthService {
       'email_verified': false,
       'teacher_verified': false,
     };
-    await _client.from('users').upsert(userMap);
+
+    // 1. Create auth account and pass all fields as metadata so the
+    //    handle_new_auth_user trigger can create the profile immediately.
+    AuthResponse res;
+    try {
+      res = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'full_name': fullName,
+          'role': UserRole.student.name,
+          'first_name': firstName,
+          'last_name': lastName,
+          'student_id_number': studentIdNumber,
+          'phone_number': phoneNumber,
+          'occupation': ?occupation,
+          'last_school_attended': ?lastSchoolAttended,
+          'last_year_attended': ?lastYearAttended,
+          'als_center_id': ?alsCenterId,
+        },
+      );
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.user == null) throw Exception('Supabase account creation failed.');
+    userMap['id'] = res.user!.id;
+
+    // 2. If we have a live session (email confirmation disabled), also upsert
+    //    from the client so age and date_of_birth (not in meta trigger) are set.
+    if (res.session != null) {
+      try {
+        await _client.from('users').upsert(userMap);
+      } catch (e) {
+        // Profile may have been created by the trigger; sign out so the user
+        // doesn't get stuck in a broken authenticated state.
+        await _client.auth.signOut();
+        rethrow;
+      }
+    }
 
     return UserModel.fromMap(Map<String, dynamic>.from(userMap));
   }
 
   /// Register a new teacher account.
   ///
-  /// Creates a Supabase Auth account (which triggers a confirmation email),
-  /// then saves the teacher profile to the Supabase `users` table.
+  /// Passes profile fields as [data] (user_metadata) so the
+  /// `handle_new_auth_user` trigger creates the profile server-side.
   Future<UserModel> registerTeacher({
     required String email,
     required String password,
@@ -99,16 +143,13 @@ class SupabaseAuthService {
     required String phoneNumber,
     String? alsCenterId,
   }) async {
-    // 1. Create Supabase Auth account
-    final res = await _client.auth.signUp(email: email, password: password);
-    if (res.user == null) throw Exception('Supabase account creation failed.');
-
-    // 2. Save profile to Supabase
     final now = DateTime.now();
+    final fullName = '$firstName $lastName';
+
     final userMap = {
-      'id': res.user!.id,
+      'id': '',
       'email': email,
-      'full_name': '$firstName $lastName',
+      'full_name': fullName,
       'role': UserRole.teacher.name,
       'als_center_id': alsCenterId,
       'is_active': true,
@@ -120,7 +161,36 @@ class SupabaseAuthService {
       'email_verified': false,
       'teacher_verified': false,
     };
-    await _client.from('users').upsert(userMap);
+
+    AuthResponse res;
+    try {
+      res = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'full_name': fullName,
+          'role': UserRole.teacher.name,
+          'first_name': firstName,
+          'last_name': lastName,
+          'phone_number': phoneNumber,
+          'als_center_id': ?alsCenterId,
+        },
+      );
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.user == null) throw Exception('Supabase account creation failed.');
+    userMap['id'] = res.user!.id;
+
+    if (res.session != null) {
+      try {
+        await _client.from('users').upsert(userMap);
+      } catch (e) {
+        await _client.auth.signOut();
+        rethrow;
+      }
+    }
 
     return UserModel.fromMap(Map<String, dynamic>.from(userMap));
   }
@@ -269,26 +339,21 @@ class SupabaseAuthService {
   // Google Sign-In (pure Supabase — no Firebase)
   // ---------------------------------------------------------------------------
 
-  // Web OAuth client ID configured on Google Cloud Console and in the
-  // Supabase Dashboard under Authentication → Providers → Google.
-  static const _googleWebClientId =
-      '941404387860-gmmjnep4i6c6coibbrd48lgv1c803mo2.apps.googleusercontent.com';
-
   /// Sign in with Google using Supabase Auth.
   ///
   /// On mobile (Android/iOS) the native Google Sign-In flow fetches an ID
   /// token which is exchanged with Supabase via [signInWithIdToken].
   /// On web, Supabase handles the full OAuth redirect internally.
   ///
+  /// Requires GOOGLE_WEB_CLIENT_ID in .env (Web Application client ID from
+  /// Google Cloud Console — NOT the Android client ID).
+  ///
   /// [role] is required only for NEW users (first sign-in).
   /// Returns [UserModel] on success, throws on failure.
   Future<UserModel?> signInWithGoogle({required UserRole role}) async {
     // ---- WEB ----------------------------------------------------------------
     if (kIsWeb) {
-      await _client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'YOUR_WEB_REDIRECT_URL', // replace with your web app URL
-      );
+      await _client.auth.signInWithOAuth(OAuthProvider.google);
       // signInWithOAuth performs a browser redirect; the result comes back
       // through the auth state stream. Return null here — the caller should
       // listen to authStateChanges for the updated session.
@@ -296,6 +361,13 @@ class SupabaseAuthService {
     }
 
     // ---- MOBILE (Android / iOS) --------------------------------------------
+    if (_googleWebClientId == null || _googleWebClientId.isEmpty) {
+      throw Exception(
+        'Google Sign-In is not configured. '
+        'Set GOOGLE_WEB_CLIENT_ID in your .env file.',
+      );
+    }
+
     // serverClientId tells the native SDK which web OAuth client to use so
     // that an ID token (not just an access token) is returned.
     final googleSignIn = GoogleSignIn(serverClientId: _googleWebClientId);
