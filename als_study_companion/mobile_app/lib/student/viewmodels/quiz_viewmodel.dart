@@ -43,10 +43,23 @@ class QuizViewModel extends ChangeNotifier {
     try {
       _currentQuiz = await _repository.getQuizById(quizId);
       if (_currentQuiz != null) {
-        _questions = await _repository.getQuestionsByQuiz(quizId);
+        // Try remote first, fallback to local
+        final remoteQuestions =
+            await _repository.fetchRemoteQuestions(quizId);
+        _questions = remoteQuestions.isNotEmpty
+            ? remoteQuestions
+            : await _repository.getQuestionsByQuiz(quizId);
       }
     } catch (e) {
-      _errorMessage = 'Failed to load quiz: ${e.toString()}';
+      // Fallback to local on any error
+      try {
+        _currentQuiz = await _repository.getQuizById(quizId);
+        if (_currentQuiz != null) {
+          _questions = await _repository.getQuestionsByQuiz(quizId);
+        }
+      } catch (_) {
+        _errorMessage = 'Failed to load quiz: ${e.toString()}';
+      }
     }
 
     _isLoading = false;

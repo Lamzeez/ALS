@@ -22,9 +22,17 @@ class QuizCreatorViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _quizzes = await _repository.getQuizzesByTeacher(teacherId);
+      // Try remote first, fallback to local
+      final remote = await _repository.fetchRemoteQuizzes(teacherId);
+      _quizzes = remote.isNotEmpty
+          ? remote
+          : await _repository.getQuizzesByTeacher(teacherId);
     } catch (e) {
-      _errorMessage = 'Failed to load quizzes: ${e.toString()}';
+      try {
+        _quizzes = await _repository.getQuizzesByTeacher(teacherId);
+      } catch (_) {
+        _errorMessage = 'Failed to load quizzes: ${e.toString()}';
+      }
     }
 
     _isLoading = false;
@@ -44,6 +52,7 @@ class QuizCreatorViewModel extends ChangeNotifier {
   Future<bool> createQuiz(QuizModel quiz) async {
     try {
       await _repository.createQuiz(quiz);
+      _repository.pushQuiz(quiz); // push to remote (fire-and-forget)
       _quizzes.insert(0, quiz);
       notifyListeners();
       return true;
@@ -57,6 +66,7 @@ class QuizCreatorViewModel extends ChangeNotifier {
   Future<bool> addQuestion(QuestionModel question) async {
     try {
       await _repository.addQuestion(question);
+      _repository.pushQuestion(question); // push to remote (fire-and-forget)
       _questions.add(question);
       notifyListeners();
       return true;

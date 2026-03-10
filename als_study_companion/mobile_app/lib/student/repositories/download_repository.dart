@@ -1,7 +1,8 @@
 import 'package:shared_core/shared_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
-/// Repository for managing content downloads.
+/// Repository for managing content downloads (SQLite local cache & Supabase remote).
 class DownloadRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
 
@@ -46,5 +47,32 @@ class DownloadRepository {
       whereArgs: [studentId, 'downloaded'],
     );
     return maps.map((m) => DownloadModel.fromMap(m)).toList();
+  }
+
+  // ─── Supabase Remote Operations ───
+
+  Future<List<DownloadModel>> fetchRemoteDownloads(String studentId) async {
+    try {
+      final res = await Supabase.instance.client
+          .from('downloads')
+          .select()
+          .eq('student_id', studentId);
+      final items = List<Map<String, dynamic>>.from(res as List);
+      final downloads = items.map((m) => DownloadModel.fromMap(m)).toList();
+      for (final d in downloads) {
+        await _db.insert(DbConstants.tableDownloads, d.toMap());
+      }
+      return downloads;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> pushDownload(DownloadModel download) async {
+    try {
+      await Supabase.instance.client
+          .from('downloads')
+          .upsert(download.toMap());
+    } catch (_) {}
   }
 }

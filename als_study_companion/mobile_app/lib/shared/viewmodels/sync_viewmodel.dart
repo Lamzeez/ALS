@@ -1,21 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:shared_core/shared_core.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:backend_services/backend_services.dart';
 import '../../core/database/database_helper.dart';
 
-/// ViewModel for managing data synchronization between local SQLite and Firebase.
+/// ViewModel for managing data synchronization between local SQLite and Supabase.
 class SyncViewModel extends ChangeNotifier {
+  final SyncService _syncService;
+
   SyncStatus _status = SyncStatus.synced;
   bool _isSyncing = false;
   String? _lastSyncTime;
   String? _errorMessage;
+
+  SyncViewModel({required SyncService syncService})
+      : _syncService = syncService;
 
   SyncStatus get status => _status;
   bool get isSyncing => _isSyncing;
   String? get lastSyncTime => _lastSyncTime;
   String? get errorMessage => _errorMessage;
 
-  /// Trigger a full sync cycle.
+  /// All tables to sync.
+  static const _syncTables = [
+    ('lessons', DbConstants.tableLessons),
+    ('quizzes', DbConstants.tableQuizzes),
+    ('questions', DbConstants.tableQuestions),
+    ('progress', DbConstants.tableProgress),
+    ('sessions', DbConstants.tableSessions),
+    ('announcements', DbConstants.tableAnnouncements),
+    ('als_centers', DbConstants.tableAlsCenters),
+    ('students', DbConstants.tableStudents),
+    ('teachers', DbConstants.tableTeachers),
+  ];
+
+  /// Tables that support pushing local changes (have syncStatus column).
+  static const _pushableTables = [
+    ('progress', DbConstants.tableProgress),
+  ];
+
+  /// Trigger a full sync cycle using SyncService with retry.
   Future<void> syncAll() async {
     if (_isSyncing) return;
 
@@ -24,75 +47,65 @@ class SyncViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    try {
-      // Step 1: Push offline data to cloud
-      await _pushOfflineData();
+    final result = await _syncService.performSyncWithRetry(
+      pushCallback: _pushOfflineData,
+      pullCallback: _pullCloudUpdates,
+    );
 
-      // Step 2: Pull updates from cloud
-      await _pullCloudUpdates();
-
+    if (result.success) {
       _status = SyncStatus.synced;
       _lastSyncTime = DateTime.now().toIso8601String();
-    } catch (e) {
+    } else {
       _status = SyncStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = result.message;
     }
 
     _isSyncing = false;
     notifyListeners();
   }
 
-  /// Push locally stored offline data to Firebase.
-  Future<void> _pushOfflineData() async {
-    try {
-      // Push progress records with syncStatus != 'synced'
-      final pending = await DatabaseHelper.instance.queryWhere(
-        DbConstants.tableProgress,
+  /// Push locally modified records to Supabase.
+  Future<int> _pushOfflineData() async {
+    int count = 0;
+    final db = DatabaseHelper.instance;
+
+    for (final (remoteTable, localTable) in _pushableTables) {
+      final pending = await db.queryWhere(
+        localTable,
         where: "syncStatus != ?",
         whereArgs: ['synced'],
       );
 
-      for (final record in pending) {
-        final id = record['id'] as String?;
-        if (id == null) continue;
-        // upsert to Supabase
-        await Supabase.instance.client.from('progress').upsert(record);
-        // mark as synced locally
-        record['syncStatus'] = 'synced';
-        await DatabaseHelper.instance.update(DbConstants.tableProgress, record, id);
+      if (pending.isNotEmpty) {
+        await _syncService.pushDocuments(remoteTable, pending);
+
+        for (final record in pending) {
+          final id = record['id'] as String?;
+          if (id == null) continue;
+          record['syncStatus'] = 'synced';
+          await db.update(localTable, record, id);
+          count++;
+        }
       }
-    } catch (e) {
-      // leave error state to caller
-      rethrow;
     }
+
+    return count;
   }
 
-  /// Pull latest data from Firebase to local SQLite.
-  Future<void> _pullCloudUpdates() async {
-    try {
-      // Pull lessons
-      final lessonsRes = await Supabase.instance.client.from('lessons').select();
-      final lessons = List<Map<String, dynamic>>.from(lessonsRes as List);
-      for (final map in lessons) {
-        await DatabaseHelper.instance.insert(DbConstants.tableLessons, map);
-      }
+  /// Pull latest data from Supabase to local SQLite.
+  Future<int> _pullCloudUpdates() async {
+    int count = 0;
+    final db = DatabaseHelper.instance;
 
-      // Pull quizzes
-      final quizzesRes = await Supabase.instance.client.from('quizzes').select();
-      final quizzes = List<Map<String, dynamic>>.from(quizzesRes as List);
-      for (final map in quizzes) {
-        await DatabaseHelper.instance.insert(DbConstants.tableQuizzes, map);
+    for (final (remoteTable, localTable) in _syncTables) {
+      final docs = await _syncService.pullDocuments(remoteTable);
+      for (final map in docs) {
+        await db.insert(localTable, map);
+        count++;
       }
-
-      // Pull announcements
-      final annRes = await Supabase.instance.client.from('announcements').select();
-      final anns = List<Map<String, dynamic>>.from(annRes as List);
-      for (final map in anns) {
-        await DatabaseHelper.instance.insert(DbConstants.tableAnnouncements, map);
-      }
-    } catch (e) {
-      rethrow;
     }
+
+    return count;
   }
 
   /// Sync only progress data.
@@ -101,12 +114,16 @@ class SyncViewModel extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
-    try {
-      await _pushOfflineData();
+    final result = await _syncService.performSync(
+      pushCallback: _pushOfflineData,
+      pullCallback: () async => 0,
+    );
+
+    if (result.success) {
       _status = SyncStatus.synced;
-    } catch (e) {
+    } else {
       _status = SyncStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = result.message;
     }
 
     _isSyncing = false;
