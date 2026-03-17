@@ -1,4 +1,5 @@
 import 'package:shared_core/shared_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
 /// Repository for announcement operations.
@@ -27,10 +28,15 @@ class AnnouncementRepository {
   }
 
   Future<void> createAnnouncement(AnnouncementModel announcement) async {
-    await _db.insert(DbConstants.tableAnnouncements, announcement.toMap());
+    final map = announcement.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.insert(DbConstants.tableAnnouncements, map);
   }
 
   Future<void> deleteAnnouncement(String id) async {
     await _db.delete(DbConstants.tableAnnouncements, id);
+    try {
+      await Supabase.instance.client.from('announcements').delete().eq('id', id);
+    } catch (_) {}
   }
 }

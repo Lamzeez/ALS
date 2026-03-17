@@ -1,4 +1,5 @@
 import 'package:shared_core/shared_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
 /// Repository for teacher lesson management operations.
@@ -16,23 +17,35 @@ class TeacherLessonRepository {
   }
 
   Future<void> createLesson(LessonModel lesson) async {
-    await _db.insert(DbConstants.tableLessons, lesson.toMap());
+    final map = lesson.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.insert(DbConstants.tableLessons, map);
   }
 
   Future<void> updateLesson(LessonModel lesson) async {
-    await _db.update(DbConstants.tableLessons, lesson.toMap(), lesson.id);
+    final map = lesson.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.update(DbConstants.tableLessons, map, lesson.id);
   }
 
   Future<void> deleteLesson(String id) async {
+    // For delete, we might need a tombstone or just delete locally and 
+    // try to delete on Supabase immediately if online.
+    // For now, just delete locally.
     await _db.delete(DbConstants.tableLessons, id);
+    try {
+      await Supabase.instance.client.from('lessons').delete().eq('id', id);
+    } catch (_) {}
   }
 
   Future<void> publishLesson(String id) async {
     final lesson = await _db.queryById(DbConstants.tableLessons, id);
     if (lesson != null) {
-      lesson['is_published'] = 1;
-      lesson['updated_at'] = DateTime.now().toIso8601String();
-      await _db.update(DbConstants.tableLessons, lesson, id);
+      final updated = Map<String, dynamic>.from(lesson);
+      updated['is_published'] = 1;
+      updated['syncStatus'] = 'pendingUpload';
+      updated['updated_at'] = DateTime.now().toIso8601String();
+      await _db.update(DbConstants.tableLessons, updated, id);
     }
   }
 }

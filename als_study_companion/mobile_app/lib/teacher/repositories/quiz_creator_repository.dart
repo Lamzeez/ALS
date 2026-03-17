@@ -1,4 +1,5 @@
 import 'package:shared_core/shared_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
 /// Repository for quiz creation and management.
@@ -16,23 +17,35 @@ class QuizCreatorRepository {
   }
 
   Future<void> createQuiz(QuizModel quiz) async {
-    await _db.insert(DbConstants.tableQuizzes, quiz.toMap());
+    final map = quiz.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.insert(DbConstants.tableQuizzes, map);
   }
 
   Future<void> updateQuiz(QuizModel quiz) async {
-    await _db.update(DbConstants.tableQuizzes, quiz.toMap(), quiz.id);
+    final map = quiz.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.update(DbConstants.tableQuizzes, map, quiz.id);
   }
 
   Future<void> deleteQuiz(String id) async {
     await _db.delete(DbConstants.tableQuizzes, id);
+    try {
+      await Supabase.instance.client.from('quizzes').delete().eq('id', id);
+    } catch (_) {}
   }
 
   Future<void> addQuestion(QuestionModel question) async {
-    await _db.insert(DbConstants.tableQuestions, question.toMap());
+    final map = question.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.insert(DbConstants.tableQuestions, map);
   }
 
   Future<void> deleteQuestion(String id) async {
     await _db.delete(DbConstants.tableQuestions, id);
+    try {
+      await Supabase.instance.client.from('questions').delete().eq('id', id);
+    } catch (_) {}
   }
 
   Future<List<QuestionModel>> getQuestionsByQuiz(String quizId) async {

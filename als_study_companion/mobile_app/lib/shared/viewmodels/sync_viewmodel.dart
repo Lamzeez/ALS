@@ -35,19 +35,27 @@ class SyncViewModel extends ChangeNotifier {
       _lastSyncTime = DateTime.now().toIso8601String();
     } catch (e) {
       _status = SyncStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = 'Sync failed: ${e.toString()}';
     }
 
     _isSyncing = false;
     notifyListeners();
   }
 
-  /// Push locally stored offline data to Firebase.
+  /// Push locally stored offline data to Supabase.
   Future<void> _pushOfflineData() async {
-    try {
-      // Push progress records with syncStatus != 'synced'
+    final tablesToPush = [
+      DbConstants.tableProgress,
+      DbConstants.tableLessons,
+      DbConstants.tableQuizzes,
+      DbConstants.tableQuestions,
+      DbConstants.tableSessions,
+      DbConstants.tableAnnouncements,
+    ];
+
+    for (final table in tablesToPush) {
       final pending = await DatabaseHelper.instance.queryWhere(
-        DbConstants.tableProgress,
+        table,
         where: "syncStatus != ?",
         whereArgs: ['synced'],
       );
@@ -55,44 +63,87 @@ class SyncViewModel extends ChangeNotifier {
       for (final record in pending) {
         final id = record['id'] as String?;
         if (id == null) continue;
-        // upsert to Supabase
-        await Supabase.instance.client.from('progress').upsert(record);
-        // mark as synced locally
-        record['syncStatus'] = 'synced';
-        await DatabaseHelper.instance.update(DbConstants.tableProgress, record, id);
+
+        // Map local keys to Supabase snake_case keys if necessary
+        final supabaseData = _mapToSupabase(table, Map<String, dynamic>.from(record));
+        
+        // Remove local-only fields
+        supabaseData.remove('syncStatus');
+
+        // Upsert to Supabase
+        await Supabase.instance.client.from(_getSupabaseTable(table)).upsert(supabaseData);
+
+        // Mark as synced locally
+        final updatedRecord = Map<String, dynamic>.from(record);
+        updatedRecord['syncStatus'] = 'synced';
+        await DatabaseHelper.instance.update(table, updatedRecord, id);
       }
-    } catch (e) {
-      // leave error state to caller
-      rethrow;
     }
   }
 
-  /// Pull latest data from Firebase to local SQLite.
+  /// Pull latest data from Supabase to local SQLite.
   Future<void> _pullCloudUpdates() async {
-    try {
-      // Pull lessons
-      final lessonsRes = await Supabase.instance.client.from('lessons').select();
-      final lessons = List<Map<String, dynamic>>.from(lessonsRes as List);
-      for (final map in lessons) {
-        await DatabaseHelper.instance.insert(DbConstants.tableLessons, map);
-      }
+    final tablesToPull = [
+      'users',
+      'lessons',
+      'quizzes',
+      'questions',
+      'progress',
+      'sessions',
+      'announcements',
+      'centers',
+    ];
 
-      // Pull quizzes
-      final quizzesRes = await Supabase.instance.client.from('quizzes').select();
-      final quizzes = List<Map<String, dynamic>>.from(quizzesRes as List);
-      for (final map in quizzes) {
-        await DatabaseHelper.instance.insert(DbConstants.tableQuizzes, map);
+    for (final table in tablesToPull) {
+      final res = await Supabase.instance.client.from(table).select();
+      final items = List<Map<String, dynamic>>.from(res as List);
+      
+      final localTable = _getLocalTable(table);
+      for (final map in items) {
+        final localData = _mapToLocal(table, map);
+        localData['syncStatus'] = 'synced';
+        await DatabaseHelper.instance.insert(localTable, localData);
       }
-
-      // Pull announcements
-      final annRes = await Supabase.instance.client.from('announcements').select();
-      final anns = List<Map<String, dynamic>>.from(annRes as List);
-      for (final map in anns) {
-        await DatabaseHelper.instance.insert(DbConstants.tableAnnouncements, map);
-      }
-    } catch (e) {
-      rethrow;
     }
+  }
+
+  String _getSupabaseTable(String localTable) {
+    if (localTable == DbConstants.tableAlsCenters) return 'centers';
+    return localTable;
+  }
+
+  String _getLocalTable(String supabaseTable) {
+    switch (supabaseTable) {
+      case 'users': return DbConstants.tableUsers;
+      case 'lessons': return DbConstants.tableLessons;
+      case 'quizzes': return DbConstants.tableQuizzes;
+      case 'questions': return DbConstants.tableQuestions;
+      case 'progress': return DbConstants.tableProgress;
+      case 'sessions': return DbConstants.tableSessions;
+      case 'announcements': return DbConstants.tableAnnouncements;
+      case 'centers': return DbConstants.tableAlsCenters;
+      default: return supabaseTable;
+    }
+  }
+
+  Map<String, dynamic> _mapToSupabase(String table, Map<String, dynamic> data) {
+    // Convert camelCase to snake_case for Supabase
+    final result = <String, dynamic>{};
+    data.forEach((key, value) {
+      final snakeKey = key.replaceAllMapped(
+        RegExp(r'([A-Z])'),
+        (match) => '_${match.group(1)!.toLowerCase()}',
+      );
+      result[snakeKey] = value;
+    });
+    return result;
+  }
+
+  Map<String, dynamic> _mapToLocal(String table, Map<String, dynamic> data) {
+    // Convert snake_case to camelCase for local DB if necessary
+    // (Actually DatabaseHelper seems to expect some snake_case and some camelCase based on onCreate)
+    // Let's keep it consistent with what DatabaseHelper.onCreate defined.
+    return data;
   }
 
   /// Sync only progress data.

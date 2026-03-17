@@ -14,7 +14,9 @@ import 'student/viewmodels/lesson_viewmodel.dart';
 import 'student/viewmodels/quiz_viewmodel.dart';
 import 'student/viewmodels/progress_viewmodel.dart';
 import 'student/viewmodels/download_viewmodel.dart';
+import 'student/viewmodels/progress_export_viewmodel.dart';
 import 'teacher/viewmodels/teacher_lesson_viewmodel.dart';
+import 'teacher/viewmodels/video_upload_viewmodel.dart';
 import 'teacher/viewmodels/quiz_creator_viewmodel.dart';
 import 'teacher/viewmodels/student_monitor_viewmodel.dart';
 import 'teacher/viewmodels/session_viewmodel.dart';
@@ -40,10 +42,10 @@ void main() async {
   await Supabase.initialize(
     url:
         dotenv.env['SUPABASE_URL'] ??
-        'https://igaukxfswcpwvgdwcjuh.supabase.co',
+        'https://wxqnwilsegbqtmejdkqw.supabase.co',
     anonKey:
         dotenv.env['SUPABASE_ANON_KEY'] ??
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlnYXVreGZzd2Nwd3ZnZHdjanVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2ODgyMjAsImV4cCI6MjA4ODI2NDIyMH0.Yqks52OCNPRXXTvLW34QnOfxOY--tJZkqe667W-Qv-4',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4cW53aWxzZWdicXRtZWpka3F3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjM0ODksImV4cCI6MjA4ODYzOTQ4OX0.YF7Sms7XMI2bJmJmjIjTej24T88KaMVif4Tm5OlHFks',
     debug: false,
   );
 
@@ -88,9 +90,11 @@ class ALSStudyCompanionApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => QuizViewModel()),
         ChangeNotifierProvider(create: (_) => ProgressViewModel()),
         ChangeNotifierProvider(create: (_) => DownloadViewModel()),
+        ChangeNotifierProvider(create: (_) => ProgressExportViewModel()),
 
         // Teacher ViewModels
         ChangeNotifierProvider(create: (_) => TeacherLessonViewModel()),
+        ChangeNotifierProvider(create: (_) => VideoUploadViewModel()),
         ChangeNotifierProvider(create: (_) => QuizCreatorViewModel()),
         ChangeNotifierProvider(create: (_) => StudentMonitorViewModel()),
         ChangeNotifierProvider(create: (_) => SessionViewModel()),

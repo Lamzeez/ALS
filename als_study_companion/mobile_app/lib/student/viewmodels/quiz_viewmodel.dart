@@ -76,7 +76,7 @@ class QuizViewModel extends ChangeNotifier {
   }
 
   /// Submit the quiz and calculate score.
-  void submitQuiz() {
+  Future<void> submitQuiz({String? studentId, String? lessonId}) async {
     _score = 0;
     for (int i = 0; i < _questions.length; i++) {
       if (_selectedAnswers[i] == _questions[i].correctOptionIndex) {

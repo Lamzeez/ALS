@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../shared/viewmodels/sync_viewmodel.dart';
 import 'student_lessons_view.dart';
 import 'student_progress_view.dart';
 import 'student_downloads_view.dart';
@@ -68,8 +70,24 @@ class _StudentHomeTab extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),
-            onPressed: () {
-              // TODO: Trigger sync
+            onPressed: () async {
+              final syncVm = context.read<SyncViewModel>();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Syncing data...')),
+              );
+              await syncVm.syncAll();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      syncVm.errorMessage ?? 'Sync completed successfully',
+                    ),
+                    backgroundColor:
+                        syncVm.errorMessage != null ? Colors.red : Colors.green,
+                  ),
+                );
+              }
             },
           ),
           IconButton(

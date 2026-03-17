@@ -240,15 +240,18 @@ class UserManagementViewModel extends ChangeNotifier {
 
   Future<void> _logAudit(String action, String targetId, String detail) async {
     try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+      
       await Supabase.instance.client.from('audit_logs').insert({
         'action': action,
-        'target_user_id': targetId,
+        'target_id': targetId,
         'details': detail,
-        'performed_by': Supabase.instance.client.auth.currentUser?.id,
+        'admin_id': user.id,
         'created_at': DateTime.now().toIso8601String(),
       });
     } catch (_) {
-      // Table may not exist yet — silent
+      // Table may not exist yet or no permission — silent
     }
   }
 
