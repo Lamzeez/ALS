@@ -28,23 +28,32 @@ class SessionRepository {
   }
 
   Future<void> createSession(SessionModel session) async {
-    await _db.insert(DbConstants.tableSessions, session.toMap());
+    final map = session.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.insert(DbConstants.tableSessions, map);
   }
 
   Future<void> updateSession(SessionModel session) async {
-    await _db.update(DbConstants.tableSessions, session.toMap(), session.id);
+    final map = session.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.update(DbConstants.tableSessions, map, session.id);
   }
 
   Future<void> deleteSession(String id) async {
     await _db.delete(DbConstants.tableSessions, id);
+    try {
+      await Supabase.instance.client.from('sessions').delete().eq('id', id);
+    } catch (_) {}
   }
 
   Future<void> completeSession(String id) async {
     final session = await _db.queryById(DbConstants.tableSessions, id);
     if (session != null) {
-      session['is_completed'] = 1;
-      session['updated_at'] = DateTime.now().toIso8601String();
-      await _db.update(DbConstants.tableSessions, session, id);
+      final updated = Map<String, dynamic>.from(session);
+      updated['is_completed'] = 1;
+      updated['syncStatus'] = 'pendingUpload';
+      updated['updated_at'] = DateTime.now().toIso8601String();
+      await _db.update(DbConstants.tableSessions, updated, id);
     }
   }
 

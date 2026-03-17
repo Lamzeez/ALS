@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../shared/viewmodels/sync_viewmodel.dart';
 import 'teacher_lessons_view.dart';
+import 'teacher_lesson_create_view.dart';
 import 'teacher_students_view.dart';
 import 'teacher_sessions_view.dart';
 import 'teacher_announcements_view.dart';
@@ -71,7 +74,28 @@ class _TeacherHomeTab extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Teacher Dashboard'),
         actions: [
-          IconButton(icon: const Icon(Icons.sync), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.sync),
+            onPressed: () async {
+              final syncVm = context.read<SyncViewModel>();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Syncing data...')),
+              );
+              await syncVm.syncAll();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      syncVm.errorMessage ?? 'Sync completed successfully',
+                    ),
+                    backgroundColor:
+                        syncVm.errorMessage != null ? Colors.red : Colors.green,
+                  ),
+                );
+              }
+            },
+          ),
           IconButton(icon: const Icon(Icons.person_outline), onPressed: () {}),
         ],
       ),
@@ -119,7 +143,13 @@ class _TeacherHomeTab extends StatelessWidget {
                   icon: Icons.add_circle_outline,
                   label: 'New Lesson',
                   color: Colors.blue,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TeacherLessonCreateView(),
+                      ),
+                    );
+                  },
                 ),
                 _QuickActionCard(
                   icon: Icons.quiz_outlined,

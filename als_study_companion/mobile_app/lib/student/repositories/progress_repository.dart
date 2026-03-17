@@ -29,20 +29,32 @@ class ProgressRepository {
   }
 
   Future<void> saveProgress(ProgressModel progress) async {
-    await _db.insert(DbConstants.tableProgress, progress.toMap());
+    final map = progress.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.insert(DbConstants.tableProgress, map);
   }
 
   Future<void> updateProgress(ProgressModel progress) async {
-    await _db.update(DbConstants.tableProgress, progress.toMap(), progress.id);
+    final map = progress.toMap();
+    map['syncStatus'] = 'pendingUpload';
+    await _db.update(DbConstants.tableProgress, map, progress.id);
   }
 
-  Future<List<ProgressModel>> getPendingSyncProgress() async {
-    final maps = await _db.queryWhere(
-      DbConstants.tableProgress,
-      where: 'syncStatus = ?',
-      whereArgs: ['pendingUpload'],
-    );
-    return maps.map((m) => ProgressModel.fromMap(m)).toList();
+  Future<void> syncProgressWithRemote(String studentId) async {
+    try {
+      final res = await Supabase.instance.client
+          .from('progress')
+          .select()
+          .eq('student_id', studentId);
+      
+      final remoteItems = List<Map<String, dynamic>>.from(res as List);
+      for (final item in remoteItems) {
+        // Simple merge: remote wins for now
+        await _db.insert(DbConstants.tableProgress, item);
+      }
+    } catch (e) {
+      // Offline or error
+    }
   }
 
   Future<double> getOverallProgress(String studentId) async {

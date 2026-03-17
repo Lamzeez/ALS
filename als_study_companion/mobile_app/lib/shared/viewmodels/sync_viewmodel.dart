@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_core/shared_core.dart';
 import 'package:backend_services/backend_services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
 /// ViewModel for managing data synchronization between local SQLite and Supabase.
@@ -28,7 +29,7 @@ class SyncViewModel extends ChangeNotifier {
     ('progress', DbConstants.tableProgress),
     ('sessions', DbConstants.tableSessions),
     ('announcements', DbConstants.tableAnnouncements),
-    ('als_centers', DbConstants.tableAlsCenters),
+    ('centers', DbConstants.tableAlsCenters),
     ('students', DbConstants.tableStudents),
     ('teachers', DbConstants.tableTeachers),
   ];
@@ -36,6 +37,11 @@ class SyncViewModel extends ChangeNotifier {
   /// Tables that support pushing local changes (have syncStatus column).
   static const _pushableTables = [
     ('progress', DbConstants.tableProgress),
+    ('lessons', DbConstants.tableLessons),
+    ('quizzes', DbConstants.tableQuizzes),
+    ('questions', DbConstants.tableQuestions),
+    ('sessions', DbConstants.tableSessions),
+    ('announcements', DbConstants.tableAnnouncements),
   ];
 
   /// Trigger a full sync cycle using SyncService with retry.
@@ -47,17 +53,22 @@ class SyncViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    final result = await _syncService.performSyncWithRetry(
-      pushCallback: _pushOfflineData,
-      pullCallback: _pullCloudUpdates,
-    );
+    try {
+      final result = await _syncService.performSyncWithRetry(
+        pushCallback: _pushOfflineData,
+        pullCallback: _pullCloudUpdates,
+      );
 
-    if (result.success) {
-      _status = SyncStatus.synced;
-      _lastSyncTime = DateTime.now().toIso8601String();
-    } else {
+      if (result.success) {
+        _status = SyncStatus.synced;
+        _lastSyncTime = DateTime.now().toIso8601String();
+      } else {
+        _status = SyncStatus.error;
+        _errorMessage = result.message;
+      }
+    } catch (e) {
       _status = SyncStatus.error;
-      _errorMessage = result.message;
+      _errorMessage = 'Sync failed: ${e.toString()}';
     }
 
     _isSyncing = false;
@@ -77,13 +88,23 @@ class SyncViewModel extends ChangeNotifier {
       );
 
       if (pending.isNotEmpty) {
-        await _syncService.pushDocuments(remoteTable, pending);
-
         for (final record in pending) {
           final id = record['id'] as String?;
           if (id == null) continue;
-          record['syncStatus'] = 'synced';
-          await db.update(localTable, record, id);
+
+          // Map local keys to Supabase snake_case keys
+          final supabaseData = _mapToSupabase(localTable, Map<String, dynamic>.from(record));
+          
+          // Remove local-only fields
+          supabaseData.remove('sync_status');
+
+          // Upsert to Supabase
+          await Supabase.instance.client.from(remoteTable).upsert(supabaseData);
+
+          // Mark as synced locally
+          final updatedRecord = Map<String, dynamic>.from(record);
+          updatedRecord['syncStatus'] = 'synced';
+          await db.update(localTable, updatedRecord, id);
           count++;
         }
       }
@@ -98,14 +119,45 @@ class SyncViewModel extends ChangeNotifier {
     final db = DatabaseHelper.instance;
 
     for (final (remoteTable, localTable) in _syncTables) {
-      final docs = await _syncService.pullDocuments(remoteTable);
+      final res = await Supabase.instance.client.from(remoteTable).select();
+      final docs = List<Map<String, dynamic>>.from(res as List);
+      
       for (final map in docs) {
-        await db.insert(localTable, map);
+        final localData = _mapToLocal(localTable, map);
+        localData['syncStatus'] = 'synced';
+        await db.insert(localTable, localData);
         count++;
       }
     }
 
     return count;
+  }
+
+  Map<String, dynamic> _mapToSupabase(String table, Map<String, dynamic> data) {
+    // Convert camelCase to snake_case for Supabase
+    final result = <String, dynamic>{};
+    data.forEach((key, value) {
+      final snakeKey = key.replaceAllMapped(
+        RegExp(r'([A-Z])'),
+        (match) => '_${match.group(1)!.toLowerCase()}',
+      );
+      result[snakeKey] = value;
+    });
+    return result;
+  }
+
+  Map<String, dynamic> _mapToLocal(String table, Map<String, dynamic> data) {
+    // Convert snake_case to camelCase for local DB if necessary
+    // Based on DatabaseHelper.onCreate, we use camelCase for most things.
+    final result = <String, dynamic>{};
+    data.forEach((key, value) {
+      final camelKey = key.replaceAllMapped(
+        RegExp(r'_([a-z])'),
+        (match) => match.group(1)!.toUpperCase(),
+      );
+      result[camelKey] = value;
+    });
+    return result;
   }
 
   /// Sync only progress data.
@@ -114,16 +166,21 @@ class SyncViewModel extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
-    final result = await _syncService.performSync(
-      pushCallback: _pushOfflineData,
-      pullCallback: () async => 0,
-    );
+    try {
+      final result = await _syncService.performSync(
+        pushCallback: _pushOfflineData,
+        pullCallback: () async => 0,
+      );
 
-    if (result.success) {
-      _status = SyncStatus.synced;
-    } else {
+      if (result.success) {
+        _status = SyncStatus.synced;
+      } else {
+        _status = SyncStatus.error;
+        _errorMessage = result.message;
+      }
+    } catch (e) {
       _status = SyncStatus.error;
-      _errorMessage = result.message;
+      _errorMessage = e.toString();
     }
 
     _isSyncing = false;
