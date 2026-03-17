@@ -24,9 +24,17 @@ class StudentMonitorViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _students = await _repository.getStudentsByTeacher(teacherId);
+      // Try remote first, fallback to local
+      final remote = await _repository.fetchRemoteStudents(teacherId);
+      _students = remote.isNotEmpty
+          ? remote
+          : await _repository.getStudentsByTeacher(teacherId);
     } catch (e) {
-      _errorMessage = 'Failed to load students: ${e.toString()}';
+      try {
+        _students = await _repository.getStudentsByTeacher(teacherId);
+      } catch (_) {
+        _errorMessage = 'Failed to load students: ${e.toString()}';
+      }
     }
 
     _isLoading = false;
@@ -39,11 +47,20 @@ class StudentMonitorViewModel extends ChangeNotifier {
 
     try {
       _selectedStudent = await _repository.getStudentById(studentId);
-      _selectedStudentProgress = await _repository.getStudentProgress(
-        studentId,
-      );
+      // Try remote progress first, fallback to local
+      final remoteProgress =
+          await _repository.fetchRemoteStudentProgress(studentId);
+      _selectedStudentProgress = remoteProgress.isNotEmpty
+          ? remoteProgress
+          : await _repository.getStudentProgress(studentId);
     } catch (e) {
-      _errorMessage = 'Failed to load progress: ${e.toString()}';
+      try {
+        _selectedStudent = await _repository.getStudentById(studentId);
+        _selectedStudentProgress =
+            await _repository.getStudentProgress(studentId);
+      } catch (_) {
+        _errorMessage = 'Failed to load progress: ${e.toString()}';
+      }
     }
 
     _isLoading = false;

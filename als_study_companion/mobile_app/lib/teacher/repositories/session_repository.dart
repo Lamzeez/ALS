@@ -2,7 +2,7 @@ import 'package:shared_core/shared_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
-/// Repository for session scheduling operations.
+/// Repository for session scheduling operations (SQLite local cache & Supabase remote).
 class SessionRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
 
@@ -55,5 +55,31 @@ class SessionRepository {
       updated['updated_at'] = DateTime.now().toIso8601String();
       await _db.update(DbConstants.tableSessions, updated, id);
     }
+  }
+
+  // ─── Supabase Remote Operations ───
+
+  Future<List<SessionModel>> fetchRemoteSessions(String teacherId) async {
+    try {
+      final res = await Supabase.instance.client
+          .from('sessions')
+          .select()
+          .eq('teacher_id', teacherId)
+          .order('scheduled_at', ascending: false);
+      final items = List<Map<String, dynamic>>.from(res as List);
+      final sessions = items.map((m) => SessionModel.fromMap(m)).toList();
+      for (final session in sessions) {
+        await _db.insert(DbConstants.tableSessions, session.toMap());
+      }
+      return sessions;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> pushSession(SessionModel session) async {
+    try {
+      await Supabase.instance.client.from('sessions').upsert(session.toMap());
+    } catch (_) {}
   }
 }

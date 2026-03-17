@@ -23,10 +23,22 @@ class ProgressViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _progressList = await _repository.getProgressByStudent(studentId);
+      // Try remote first for latest data
+      final remote = await _repository.fetchRemoteProgress(studentId);
+      if (remote.isNotEmpty) {
+        _progressList = remote;
+      } else {
+        _progressList = await _repository.getProgressByStudent(studentId);
+      }
       _overallProgress = await _repository.getOverallProgress(studentId);
     } catch (e) {
-      _errorMessage = 'Failed to load progress: ${e.toString()}';
+      // Fallback to local on any error
+      try {
+        _progressList = await _repository.getProgressByStudent(studentId);
+        _overallProgress = await _repository.getOverallProgress(studentId);
+      } catch (_) {
+        _errorMessage = 'Failed to load progress: ${e.toString()}';
+      }
     }
 
     _isLoading = false;

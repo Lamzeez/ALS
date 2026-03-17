@@ -1,21 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:shared_core/shared_core.dart';
+import 'package:backend_services/backend_services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
-/// ViewModel for managing data synchronization between local SQLite and Firebase.
+/// ViewModel for managing data synchronization between local SQLite and Supabase.
 class SyncViewModel extends ChangeNotifier {
+  final SyncService _syncService;
+
   SyncStatus _status = SyncStatus.synced;
   bool _isSyncing = false;
   String? _lastSyncTime;
   String? _errorMessage;
+
+  SyncViewModel({required SyncService syncService})
+      : _syncService = syncService;
 
   SyncStatus get status => _status;
   bool get isSyncing => _isSyncing;
   String? get lastSyncTime => _lastSyncTime;
   String? get errorMessage => _errorMessage;
 
-  /// Trigger a full sync cycle.
+  /// All tables to sync.
+  static const _syncTables = [
+    ('lessons', DbConstants.tableLessons),
+    ('quizzes', DbConstants.tableQuizzes),
+    ('questions', DbConstants.tableQuestions),
+    ('progress', DbConstants.tableProgress),
+    ('sessions', DbConstants.tableSessions),
+    ('announcements', DbConstants.tableAnnouncements),
+    ('centers', DbConstants.tableAlsCenters),
+    ('students', DbConstants.tableStudents),
+    ('teachers', DbConstants.tableTeachers),
+  ];
+
+  /// Tables that support pushing local changes (have syncStatus column).
+  static const _pushableTables = [
+    ('progress', DbConstants.tableProgress),
+    ('lessons', DbConstants.tableLessons),
+    ('quizzes', DbConstants.tableQuizzes),
+    ('questions', DbConstants.tableQuestions),
+    ('sessions', DbConstants.tableSessions),
+    ('announcements', DbConstants.tableAnnouncements),
+  ];
+
+  /// Trigger a full sync cycle using SyncService with retry.
   Future<void> syncAll() async {
     if (_isSyncing) return;
 
@@ -25,14 +54,18 @@ class SyncViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Step 1: Push offline data to cloud
-      await _pushOfflineData();
+      final result = await _syncService.performSyncWithRetry(
+        pushCallback: _pushOfflineData,
+        pullCallback: _pullCloudUpdates,
+      );
 
-      // Step 2: Pull updates from cloud
-      await _pullCloudUpdates();
-
-      _status = SyncStatus.synced;
-      _lastSyncTime = DateTime.now().toIso8601String();
+      if (result.success) {
+        _status = SyncStatus.synced;
+        _lastSyncTime = DateTime.now().toIso8601String();
+      } else {
+        _status = SyncStatus.error;
+        _errorMessage = result.message;
+      }
     } catch (e) {
       _status = SyncStatus.error;
       _errorMessage = 'Sync failed: ${e.toString()}';
@@ -42,88 +75,62 @@ class SyncViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Push locally stored offline data to Supabase.
-  Future<void> _pushOfflineData() async {
-    final tablesToPush = [
-      DbConstants.tableProgress,
-      DbConstants.tableLessons,
-      DbConstants.tableQuizzes,
-      DbConstants.tableQuestions,
-      DbConstants.tableSessions,
-      DbConstants.tableAnnouncements,
-    ];
+  /// Push locally modified records to Supabase.
+  Future<int> _pushOfflineData() async {
+    int count = 0;
+    final db = DatabaseHelper.instance;
 
-    for (final table in tablesToPush) {
-      final pending = await DatabaseHelper.instance.queryWhere(
-        table,
+    for (final (remoteTable, localTable) in _pushableTables) {
+      final pending = await db.queryWhere(
+        localTable,
         where: "syncStatus != ?",
         whereArgs: ['synced'],
       );
 
-      for (final record in pending) {
-        final id = record['id'] as String?;
-        if (id == null) continue;
+      if (pending.isNotEmpty) {
+        for (final record in pending) {
+          final id = record['id'] as String?;
+          if (id == null) continue;
 
-        // Map local keys to Supabase snake_case keys if necessary
-        final supabaseData = _mapToSupabase(table, Map<String, dynamic>.from(record));
-        
-        // Remove local-only fields
-        supabaseData.remove('syncStatus');
+          // Map local keys to Supabase snake_case keys
+          final supabaseData = _mapToSupabase(localTable, Map<String, dynamic>.from(record));
+          
+          // Remove local-only fields
+          supabaseData.remove('sync_status');
 
-        // Upsert to Supabase
-        await Supabase.instance.client.from(_getSupabaseTable(table)).upsert(supabaseData);
+          // Upsert to Supabase
+          await Supabase.instance.client.from(remoteTable).upsert(supabaseData);
 
-        // Mark as synced locally
-        final updatedRecord = Map<String, dynamic>.from(record);
-        updatedRecord['syncStatus'] = 'synced';
-        await DatabaseHelper.instance.update(table, updatedRecord, id);
+          // Mark as synced locally
+          final updatedRecord = Map<String, dynamic>.from(record);
+          updatedRecord['syncStatus'] = 'synced';
+          await db.update(localTable, updatedRecord, id);
+          count++;
+        }
       }
     }
+
+    return count;
   }
 
   /// Pull latest data from Supabase to local SQLite.
-  Future<void> _pullCloudUpdates() async {
-    final tablesToPull = [
-      'users',
-      'lessons',
-      'quizzes',
-      'questions',
-      'progress',
-      'sessions',
-      'announcements',
-      'centers',
-    ];
+  Future<int> _pullCloudUpdates() async {
+    int count = 0;
+    final db = DatabaseHelper.instance;
 
-    for (final table in tablesToPull) {
-      final res = await Supabase.instance.client.from(table).select();
-      final items = List<Map<String, dynamic>>.from(res as List);
+    for (final (remoteTable, localTable) in _syncTables) {
+      final res = await Supabase.instance.client.from(remoteTable).select();
+      final docs = List<Map<String, dynamic>>.from(res as List);
       
-      final localTable = _getLocalTable(table);
-      for (final map in items) {
-        final localData = _mapToLocal(table, map);
+      for (final map in docs) {
+        final localData = _mapToLocal(localTable, map);
         localData['syncStatus'] = 'synced';
-        await DatabaseHelper.instance.insert(localTable, localData);
+        await db.insert(localTable, localData);
+        count++;
       }
     }
-  }
 
-  String _getSupabaseTable(String localTable) {
-    if (localTable == DbConstants.tableAlsCenters) return 'centers';
-    return localTable;
-  }
-
-  String _getLocalTable(String supabaseTable) {
-    switch (supabaseTable) {
-      case 'users': return DbConstants.tableUsers;
-      case 'lessons': return DbConstants.tableLessons;
-      case 'quizzes': return DbConstants.tableQuizzes;
-      case 'questions': return DbConstants.tableQuestions;
-      case 'progress': return DbConstants.tableProgress;
-      case 'sessions': return DbConstants.tableSessions;
-      case 'announcements': return DbConstants.tableAnnouncements;
-      case 'centers': return DbConstants.tableAlsCenters;
-      default: return supabaseTable;
-    }
+    return count;
   }
 
   Map<String, dynamic> _mapToSupabase(String table, Map<String, dynamic> data) {
@@ -141,9 +148,16 @@ class SyncViewModel extends ChangeNotifier {
 
   Map<String, dynamic> _mapToLocal(String table, Map<String, dynamic> data) {
     // Convert snake_case to camelCase for local DB if necessary
-    // (Actually DatabaseHelper seems to expect some snake_case and some camelCase based on onCreate)
-    // Let's keep it consistent with what DatabaseHelper.onCreate defined.
-    return data;
+    // Based on DatabaseHelper.onCreate, we use camelCase for most things.
+    final result = <String, dynamic>{};
+    data.forEach((key, value) {
+      final camelKey = key.replaceAllMapped(
+        RegExp(r'_([a-z])'),
+        (match) => match.group(1)!.toUpperCase(),
+      );
+      result[camelKey] = value;
+    });
+    return result;
   }
 
   /// Sync only progress data.
@@ -153,8 +167,17 @@ class SyncViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _pushOfflineData();
-      _status = SyncStatus.synced;
+      final result = await _syncService.performSync(
+        pushCallback: _pushOfflineData,
+        pullCallback: () async => 0,
+      );
+
+      if (result.success) {
+        _status = SyncStatus.synced;
+      } else {
+        _status = SyncStatus.error;
+        _errorMessage = result.message;
+      }
     } catch (e) {
       _status = SyncStatus.error;
       _errorMessage = e.toString();

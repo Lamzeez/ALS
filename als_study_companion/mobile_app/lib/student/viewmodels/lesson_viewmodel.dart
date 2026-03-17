@@ -18,16 +18,27 @@ class LessonViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String get selectedSubject => _selectedSubject;
 
-  /// Load all available lessons.
+  /// Load all available lessons (try remote first, fallback to local).
   Future<void> loadLessons() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _lessons = await _repository.getLocalLessons();
+      // Try fetching from Supabase first (caches to local SQLite)
+      final remote = await _repository.fetchRemoteLessons();
+      if (remote.isNotEmpty) {
+        _lessons = remote;
+      } else {
+        _lessons = await _repository.getLocalLessons();
+      }
     } catch (e) {
-      _errorMessage = 'Failed to load lessons: ${e.toString()}';
+      // Fallback to local on any error
+      try {
+        _lessons = await _repository.getLocalLessons();
+      } catch (_) {
+        _errorMessage = 'Failed to load lessons: ${e.toString()}';
+      }
     }
 
     _isLoading = false;

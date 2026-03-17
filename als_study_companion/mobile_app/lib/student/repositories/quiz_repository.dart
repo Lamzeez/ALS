@@ -1,9 +1,12 @@
 import 'package:shared_core/shared_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 
-/// Repository for quiz data operations.
+/// Repository for quiz data operations (SQLite local cache & Supabase remote).
 class QuizRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
+
+  // ─── SQLite Operations ───
 
   Future<List<QuizModel>> getQuizzesByLesson(String lessonId) async {
     final maps = await _db.queryWhere(
@@ -45,5 +48,55 @@ class QuizRepository {
 
   Future<void> deleteQuiz(String id) async {
     await _db.delete(DbConstants.tableQuizzes, id);
+  }
+
+  // ─── Supabase Remote Operations ───
+
+  Future<List<QuizModel>> fetchRemoteQuizzes(String lessonId) async {
+    try {
+      final res = await Supabase.instance.client
+          .from('quizzes')
+          .select()
+          .eq('lesson_id', lessonId);
+      final items = List<Map<String, dynamic>>.from(res as List);
+      final quizzes = items.map((m) => QuizModel.fromMap(m)).toList();
+      for (final quiz in quizzes) {
+        await _db.insert(DbConstants.tableQuizzes, quiz.toMap());
+      }
+      return quizzes;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<QuestionModel>> fetchRemoteQuestions(String quizId) async {
+    try {
+      final res = await Supabase.instance.client
+          .from('questions')
+          .select()
+          .eq('quiz_id', quizId);
+      final items = List<Map<String, dynamic>>.from(res as List);
+      final questions = items.map((m) => QuestionModel.fromMap(m)).toList();
+      for (final q in questions) {
+        await _db.insert(DbConstants.tableQuestions, q.toMap());
+      }
+      return questions;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> pushQuiz(QuizModel quiz) async {
+    try {
+      await Supabase.instance.client.from('quizzes').upsert(quiz.toMap());
+    } catch (_) {}
+  }
+
+  Future<void> pushQuestion(QuestionModel question) async {
+    try {
+      await Supabase.instance.client
+          .from('questions')
+          .upsert(question.toMap());
+    } catch (_) {}
   }
 }

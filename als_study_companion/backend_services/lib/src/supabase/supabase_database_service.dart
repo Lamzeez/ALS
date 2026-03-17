@@ -115,7 +115,7 @@ class SupabaseDatabaseService {
     final res = await _client
         .from('progress')
         .select()
-        .eq('user_id', studentId);
+        .eq('student_id', studentId);
     final items = List<Map<String, dynamic>>.from(res);
     return items.map((m) => ProgressModel.fromMap(m)).toList();
   }
@@ -169,14 +169,14 @@ class SupabaseDatabaseService {
 
   /// Get all ALS centers.
   Future<List<AlsCenterModel>> getAlsCenters() async {
-    final res = await _client.from('centers').select();
+    final res = await _client.from('als_centers').select();
     final items = List<Map<String, dynamic>>.from(res);
     return items.map((m) => AlsCenterModel.fromMap(m)).toList();
   }
 
   /// Save an ALS center.
   Future<void> saveAlsCenter(AlsCenterModel center) async {
-    await _client.from('centers').upsert(center.toMap());
+    await _client.from('als_centers').upsert(center.toMap());
   }
 
   // ─── Users ───────────────────────────────────────────────────────────

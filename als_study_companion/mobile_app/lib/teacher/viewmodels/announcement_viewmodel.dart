@@ -20,13 +20,31 @@ class AnnouncementViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (authorId != null) {
-        _announcements = await _repository.getAnnouncementsByAuthor(authorId);
+      // Try remote first, fallback to local
+      final remote = await _repository.fetchRemoteAnnouncements();
+      if (remote.isNotEmpty) {
+        _announcements = authorId != null
+            ? remote.where((a) => a.authorId == authorId).toList()
+            : remote;
       } else {
-        _announcements = await _repository.getAnnouncements();
+        if (authorId != null) {
+          _announcements =
+              await _repository.getAnnouncementsByAuthor(authorId);
+        } else {
+          _announcements = await _repository.getAnnouncements();
+        }
       }
     } catch (e) {
-      _errorMessage = 'Failed to load announcements: ${e.toString()}';
+      try {
+        if (authorId != null) {
+          _announcements =
+              await _repository.getAnnouncementsByAuthor(authorId);
+        } else {
+          _announcements = await _repository.getAnnouncements();
+        }
+      } catch (_) {
+        _errorMessage = 'Failed to load announcements: ${e.toString()}';
+      }
     }
 
     _isLoading = false;
@@ -36,6 +54,7 @@ class AnnouncementViewModel extends ChangeNotifier {
   Future<bool> createAnnouncement(AnnouncementModel announcement) async {
     try {
       await _repository.createAnnouncement(announcement);
+      _repository.pushAnnouncement(announcement); // push to remote (fire-and-forget)
       _announcements.insert(0, announcement);
       notifyListeners();
       return true;

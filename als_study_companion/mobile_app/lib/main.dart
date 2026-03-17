@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:backend_services/backend_services.dart'
+    show SupabaseDatabaseService, SyncService;
 import 'core/services/connectivity_service.dart';
 import 'core/database/database_helper.dart';
 import 'core/local/local_database.dart';
@@ -42,10 +44,10 @@ void main() async {
   await Supabase.initialize(
     url:
         dotenv.env['SUPABASE_URL'] ??
-        'https://wxqnwilsegbqtmejdkqw.supabase.co',
+        'https://qxknqcoaaeojbdwtqeov.supabase.co',
     anonKey:
         dotenv.env['SUPABASE_ANON_KEY'] ??
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4cW53aWxzZWdicXRtZWpka3F3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjM0ODksImV4cCI6MjA4ODYzOTQ4OX0.YF7Sms7XMI2bJmJmjIjTej24T88KaMVif4Tm5OlHFks',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4a25xY29hYWVvamJkd3RxZW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjUzMzQsImV4cCI6MjA4ODY0MTMzNH0.6IPneO_0zNV5Z-dzRF58fRU9DbY7lXRri2AkPK-5Ap0',
     debug: false,
   );
 
@@ -68,10 +70,24 @@ class ALSStudyCompanionApp extends StatelessWidget {
           create: (_) => LocalDatabase(),
           dispose: (_, db) => db.close(),
         ),
-        Provider<SupabaseAuthService>(create: (_) => SupabaseAuthService()),
+        Provider<SupabaseAuthService>(
+          create: (context) => SupabaseAuthService(
+            googleWebClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
+          ),
+        ),
         Provider<BiometricService>(create: (_) => BiometricService()),
         Provider<SecureCredentialStorage>(
           create: (_) => SecureCredentialStorage(),
+        ),
+
+        // Supabase Database & Sync Services
+        Provider<SupabaseDatabaseService>(
+          create: (_) => SupabaseDatabaseService(),
+        ),
+        Provider<SyncService>(
+          create: (context) => SyncService(
+            databaseService: context.read<SupabaseDatabaseService>(),
+          ),
         ),
 
         // Shared ViewModels
@@ -83,7 +99,11 @@ class ALSStudyCompanionApp extends StatelessWidget {
             credentialStorage: context.read<SecureCredentialStorage>(),
           ),
         ),
-        ChangeNotifierProvider(create: (_) => SyncViewModel()),
+        ChangeNotifierProvider(
+          create: (context) => SyncViewModel(
+            syncService: context.read<SyncService>(),
+          ),
+        ),
 
         // Student ViewModels
         ChangeNotifierProvider(create: (_) => LessonViewModel()),
