@@ -171,7 +171,10 @@ class _StudentLessonDetailViewState extends State<StudentLessonDetailView> {
                           context.read<QuizViewModel>().loadQuiz(_lessonQuiz!.id);
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => StudentQuizView(quizId: _lessonQuiz!.id),
+                              builder: (_) => StudentQuizView(
+                                quizId: _lessonQuiz!.id,
+                                lessonId: widget.lesson.id,
+                              ),
                             ),
                           );
                         },
