@@ -3,7 +3,7 @@ class DbConstants {
   DbConstants._();
 
   static const String databaseName = 'als_study_companion.db';
-  static const int databaseVersion = 3;
+  static const int databaseVersion = 6;
 
   // Table names
   static const String tableUsers = 'users';

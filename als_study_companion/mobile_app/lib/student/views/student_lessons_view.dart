@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/lesson_viewmodel.dart';
+import 'student_lesson_detail_view.dart';
 
 /// View for browsing and selecting lessons.
 class StudentLessonsView extends StatefulWidget {
@@ -108,7 +109,11 @@ class _StudentLessonsViewState extends State<StudentLessonsView> {
                       ],
                     ),
                     onTap: () {
-                      // TODO: Navigate to lesson detail view
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => StudentLessonDetailView(lesson: lesson),
+                        ),
+                      );
                     },
                   ),
                 );

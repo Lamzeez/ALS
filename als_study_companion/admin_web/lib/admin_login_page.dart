@@ -23,10 +23,10 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     // Prefill credentials in debug mode to help local development and testing.
     // These values are for development only — never commit real credentials.
     if (kDebugMode) {
-      _emailCtrl.text = 'bondavemonton09@gmail.com';
-      _passwordCtrl.text = 'Admin@123';
+      _emailCtrl.text = 'Admin@als.edu.ph'; 
+      _passwordCtrl.text = 'Admin@123456';
     }
-  }
+  } 
 
   @override
   void dispose() {

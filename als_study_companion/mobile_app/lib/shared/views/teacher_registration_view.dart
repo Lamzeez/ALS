@@ -23,7 +23,9 @@ class _TeacherRegistrationViewState extends State<TeacherRegistrationView> {
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _employeeIdCtrl = TextEditingController();
 
+  String? _selectedCenterId;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
@@ -35,6 +37,7 @@ class _TeacherRegistrationViewState extends State<TeacherRegistrationView> {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
     _phoneCtrl.dispose();
+    _employeeIdCtrl.dispose();
     super.dispose();
   }
 
@@ -48,6 +51,8 @@ class _TeacherRegistrationViewState extends State<TeacherRegistrationView> {
       firstName: _firstNameCtrl.text.trim(),
       lastName: _lastNameCtrl.text.trim(),
       phoneNumber: _phoneCtrl.text.trim(),
+      employeeId: _employeeIdCtrl.text.trim(),
+      alsCenterId: _selectedCenterId,
     );
 
     if (!mounted) return;
@@ -130,6 +135,19 @@ class _TeacherRegistrationViewState extends State<TeacherRegistrationView> {
                 ),
                 const SizedBox(height: 16),
 
+                // Employee ID
+                TextFormField(
+                  controller: _employeeIdCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Employee ID *',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter your DepEd Employee ID',
+                  ),
+                  validator: (v) => Validators.validateRequired(v, 'Employee ID'),
+                ),
+                const SizedBox(height: 16),
+
                 // Email
                 TextFormField(
                   controller: _emailCtrl,
@@ -185,6 +203,36 @@ class _TeacherRegistrationViewState extends State<TeacherRegistrationView> {
                   ),
                   validator: (v) =>
                       Validators.validateConfirmPassword(v, _passwordCtrl.text),
+                ),
+                const SizedBox(height: 16),
+
+                // ALS Center Dropdown
+                Consumer<AuthViewModel>(
+                  builder: (context, authVm, child) {
+                    if (authVm.centers.isEmpty) {
+                      return OutlinedButton.icon(
+                        onPressed: () => authVm.fetchCenters(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Loading Centers... Tap to retry'),
+                      );
+                    }
+                    return DropdownButtonFormField<String>(
+                      value: _selectedCenterId,
+                      decoration: const InputDecoration(
+                        labelText: 'ALS Center *',
+                        prefixIcon: Icon(Icons.location_on_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      items: authVm.centers.map((center) {
+                        return DropdownMenuItem(
+                          value: center.id,
+                          child: Text(center.name),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setState(() => _selectedCenterId = val),
+                      validator: (v) => Validators.validateRequired(v, 'ALS Center'),
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
 

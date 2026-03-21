@@ -41,28 +41,43 @@ class _LoginViewState extends State<LoginView> {
 
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
+    _loginWithEmail();
+  }
 
+  void _loginWithEmail() async {
     setState(() => _isLoading = true);
-
     final authViewModel = context.read<AuthViewModel>();
     final success = await authViewModel.signIn(
       _emailController.text.trim(),
       _passwordController.text,
     );
-
     setState(() => _isLoading = false);
 
     if (!mounted) return;
-
     if (success) {
-      final role = authViewModel.currentRole;
-      if (role == null) {
-        _showError('Unable to determine user role');
-        return;
-      }
       _navigateAfterAuth(authViewModel);
     } else {
       _showError(authViewModel.errorMessage ?? 'Login failed');
+    }
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      _showError('Please enter your email address first');
+      return;
+    }
+
+    final authVm = context.read<AuthViewModel>();
+    await authVm.sendPasswordResetEmail(email);
+
+    if (!mounted) return;
+    if (authVm.errorMessage != null) {
+      _showError(authVm.errorMessage!);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent!')),
+      );
     }
   }
 
@@ -345,7 +360,17 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     validator: Validators.validatePassword,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+
+                // Forgot Password
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _handleForgotPassword,
+                    child: const Text('Forgot Password?'),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
                   // Login button
                   SizedBox(
@@ -433,17 +458,10 @@ class _LoginViewState extends State<LoginView> {
                     height: 48,
                     child: OutlinedButton.icon(
                       onPressed: _isLoading ? null : _handleGoogleSignIn,
-                      icon: Image.network(
-                        'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                        height: 20,
-                        width: 20,
-                        errorBuilder: (_, _, _) =>
-                            const Icon(Icons.g_mobiledata, size: 22),
-                      ),
+                      icon: const Icon(Icons.g_mobiledata, size: 28),
                       label: const Text('Continue with Google'),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                  ),                  const SizedBox(height: 16),
 
                   // Register link
                   TextButton(

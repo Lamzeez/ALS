@@ -29,9 +29,10 @@ class SupabaseStorageService {
         .uploadBinary(
           path,
           data,
-          fileOptions: contentType != null
-              ? FileOptions(contentType: contentType)
-              : const FileOptions(),
+          fileOptions: FileOptions(
+            contentType: contentType ?? 'application/octet-stream',
+            upsert: true,
+          ),
         );
     return _client.storage.from(bucket).getPublicUrl(path);
   }

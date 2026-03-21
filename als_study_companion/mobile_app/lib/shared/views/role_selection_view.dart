@@ -18,64 +18,75 @@ class RoleSelectionView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-          child: Column(
-            children: [
-              const Spacer(),
-
-              // ── App logo & title ───────────────────────────────────────────
-              Icon(
-                Icons.school,
-                size: 88,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'ALS Study Companion',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 48, // Subtract vertical padding
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Choose your role to get started',
-                style: TextStyle(color: Colors.grey[600], fontSize: 15),
-                textAlign: TextAlign.center,
-              ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const Spacer(),
 
-              const Spacer(),
+                      // ── App logo & title ───────────────────────────────────────────
+                      Icon(
+                        Icons.school,
+                        size: 88,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'ALS Study Companion',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Choose your role to get started',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                        textAlign: TextAlign.center,
+                      ),
 
-              // ── Student card ───────────────────────────────────────────────
-              _RoleCard(
-                icon: Icons.school_outlined,
-                title: "I'm a Student",
-                subtitle: 'Access lessons, quizzes & progress tracking',
-                color: const Color(0xFF1565C0),
-                onTap: () => _goToLogin(context, UserRole.student),
+                      const Spacer(),
+
+                      // ── Student card ───────────────────────────────────────────────
+                      _RoleCard(
+                        icon: Icons.school_outlined,
+                        title: "I'm a Student",
+                        subtitle: 'Access lessons, quizzes & progress tracking',
+                        color: const Color(0xFF1565C0),
+                        onTap: () => _goToLogin(context, UserRole.student),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Teacher card ───────────────────────────────────────────────
+                      _RoleCard(
+                        icon: Icons.person_outlined,
+                        title: "I'm a Teacher",
+                        subtitle: 'Manage lessons, monitor & guide students',
+                        color: const Color(0xFF2E7D32),
+                        onTap: () => _goToLogin(context, UserRole.teacher),
+                      ),
+
+                      const Spacer(),
+
+                      // ── Footer ─────────────────────────────────────────────────────
+                      Text(
+                        'Alternative Learning System',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-
-              // ── Teacher card ───────────────────────────────────────────────
-              _RoleCard(
-                icon: Icons.person_outlined,
-                title: "I'm a Teacher",
-                subtitle: 'Manage lessons, monitor & guide students',
-                color: const Color(0xFF2E7D32),
-                onTap: () => _goToLogin(context, UserRole.teacher),
-              ),
-
-              const Spacer(),
-
-              // ── Footer ─────────────────────────────────────────────────────
-              Text(
-                'Alternative Learning System',
-                style: TextStyle(color: Colors.grey[400], fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

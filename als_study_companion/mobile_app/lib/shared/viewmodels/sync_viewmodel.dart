@@ -33,9 +33,13 @@ class SyncViewModel extends ChangeNotifier {
     ('teachers', DbConstants.tableTeachers),
   ];
 
-  /// Tables that support pushing local changes (have syncStatus column).
+  /// Tables that support pushing local changes (have sync_status column).
   static const _pushableTables = [
     ('progress', DbConstants.tableProgress),
+    ('sessions', DbConstants.tableSessions),
+    ('announcements', DbConstants.tableAnnouncements),
+    ('lessons', DbConstants.tableLessons),
+    ('quizzes', DbConstants.tableQuizzes),
   ];
 
   /// Trigger a full sync cycle using SyncService with retry.
@@ -72,18 +76,25 @@ class SyncViewModel extends ChangeNotifier {
     for (final (remoteTable, localTable) in _pushableTables) {
       final pending = await db.queryWhere(
         localTable,
-        where: "syncStatus != ?",
+        where: "sync_status != ?",
         whereArgs: ['synced'],
       );
 
       if (pending.isNotEmpty) {
-        await _syncService.pushDocuments(remoteTable, pending);
+        // Prepare data for Supabase (remove sync_status column)
+        final List<Map<String, dynamic>> toPush = pending.map((record) {
+          final map = Map<String, dynamic>.from(record);
+          map.remove('sync_status');
+          return map;
+        }).toList();
+
+        await _syncService.pushDocuments(remoteTable, toPush);
 
         for (final record in pending) {
           final id = record['id'] as String?;
           if (id == null) continue;
-          record['syncStatus'] = 'synced';
-          await db.update(localTable, record, id);
+          
+          await db.update(localTable, {'sync_status': 'synced'}, id);
           count++;
         }
       }

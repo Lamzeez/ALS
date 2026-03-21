@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../shared/viewmodels/auth_viewmodel.dart';
+import '../../shared/views/profile_view.dart';
+import '../viewmodels/lesson_viewmodel.dart';
+import '../viewmodels/download_viewmodel.dart';
+import '../../shared/viewmodels/sync_viewmodel.dart';
+import 'student_lesson_detail_view.dart';
 import 'student_lessons_view.dart';
 import 'student_progress_view.dart';
 import 'student_downloads_view.dart';
@@ -60,132 +67,263 @@ class _StudentDashboardViewState extends State<StudentDashboardView> {
 class _StudentHomeTab extends StatelessWidget {
   const _StudentHomeTab();
 
+  void _handleLogout(BuildContext context) async {
+    final authVm = context.read<AuthViewModel>();
+    await authVm.signOut();
+    if (context.mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final syncVm = context.watch<SyncViewModel>();
+    final lessonVm = context.watch<LessonViewModel>();
+    final downloadVm = context.watch<DownloadViewModel>();
+    final authVm = context.watch<AuthViewModel>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ALS Study Companion'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            onPressed: () {
-              // TODO: Trigger sync
-            },
+          Stack(
+            children: [
+              IconButton(
+                icon: syncVm.isSyncing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync),
+                onPressed: syncVm.isSyncing ? null : () => syncVm.syncAll(),
+              ),
+              if (syncVm.errorMessage != null)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 8,
+                      minHeight: 8,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: () {
-              // TODO: Navigate to profile
+          PopupMenuButton<String>(
+            icon: CircleAvatar(
+              radius: 14,
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              child: authVm.currentUser?.profilePictureUrl != null
+                  ? ClipOval(
+                      child: Image.network(
+                        authVm.currentUser!.profilePictureUrl!,
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Icon(
+                      Icons.person,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+            ),
+            onSelected: (value) {
+              if (value == 'profile') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfileView()),
+                );
+              } else if (value == 'logout') {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _handleLogout(context);
+                        },
+                        child: const Text('Logout',
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+              }
             },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'profile',
+                child: Row(
                   children: [
-                    Text(
-                      'Welcome back!',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Continue your learning journey',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                    ),
+                    Icon(Icons.person_outline, size: 20),
+                    SizedBox(width: 8),
+                    Text('My Profile'),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Quick Stats
-            Text(
-              'Your Progress',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.book,
-                    label: 'Lessons',
-                    value: '0',
-                    color: Colors.blue,
-                  ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Logout', style: TextStyle(color: Colors.red)),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.quiz,
-                    label: 'Quizzes',
-                    value: '0',
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.download_done,
-                    label: 'Downloads',
-                    value: '0',
-                    color: Colors.orange,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Recent Lessons
-            Text(
-              'Recent Lessons',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text(
-                    'No lessons available yet.\nAsk your teacher to publish lessons.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey[500]),
+              ),
+            ],
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => syncVm.syncAll(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Welcome Card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome back, ${authVm.currentUser?.fullName ?? ""}!',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Continue your learning journey',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
+              // Quick Stats
+              Text(
+                'Your Progress',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatCard(
+                      icon: Icons.book,
+                      label: 'Lessons',
+                      value: lessonVm.lessons.length.toString(),
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatCard(
+                      icon: Icons.quiz,
+                      label: 'Quizzes',
+                      value: '0', // TODO: Implement overall quiz stats
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatCard(
+                      icon: Icons.download_done,
+                      label: 'Downloads',
+                      value: downloadVm.downloads.length.toString(),
+                      color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
 
-            // Announcements
-            Text(
-              'Announcements',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text(
-                    'No announcements',
-                    style: TextStyle(color: Colors.grey[500]),
+              // Recent Lessons
+              Text(
+                'Recent Lessons',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              if (lessonVm.lessons.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        'No lessons available yet.\nTap the sync button to fetch content.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: lessonVm.lessons.length.clamp(0, 3),
+                  itemBuilder: (context, index) {
+                    final lesson = lessonVm.lessons[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        title: Text(lesson.title),
+                        subtitle: Text(lesson.subject),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => StudentLessonDetailView(lesson: lesson),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+
+              const SizedBox(height: 24),
+
+              // Announcements
+              Text(
+                'Announcements',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Text(
+                      'No announcements',
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

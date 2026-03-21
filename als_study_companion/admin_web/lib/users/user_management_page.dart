@@ -198,6 +198,7 @@ class _UserManagementPageState extends State<UserManagementPage>
                           columns: const [
                             DataColumn(label: Text('Name')),
                             DataColumn(label: Text('Email')),
+                            DataColumn(label: Text('ID / Info')),
                             DataColumn(label: Text('Role')),
                             DataColumn(label: Text('Status')),
                             DataColumn(label: Text('Verified')),
@@ -215,10 +216,29 @@ class _UserManagementPageState extends State<UserManagementPage>
   }
 
   DataRow _buildRow(UserModel user) {
+    String idInfo = user.studentIdNumber ?? '-';
+    
     return DataRow(
       cells: [
         DataCell(Text(user.fullName)),
         DataCell(Text(user.email)),
+        DataCell(
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                idInfo,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              if (user.role == UserRole.teacher)
+                const Text(
+                  'Employee ID',
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+            ],
+          ),
+        ),
         DataCell(
           Chip(
             label: Text(user.role.displayName),
