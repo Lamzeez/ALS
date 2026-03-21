@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/quiz_viewmodel.dart';
+import '../viewmodels/progress_viewmodel.dart';
+import '../../shared/viewmodels/auth_viewmodel.dart';
 
 /// View for taking a quiz.
 class StudentQuizView extends StatelessWidget {
   final String quizId;
+  final String lessonId;
 
-  const StudentQuizView({super.key, required this.quizId});
+  const StudentQuizView({super.key, required this.quizId, required this.lessonId});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +22,7 @@ class StudentQuizView extends StatelessWidget {
           }
 
           if (vm.isSubmitted) {
-            return _QuizResultView(vm: vm);
+            return _QuizResultView(vm: vm, lessonId: lessonId);
           }
 
           if (vm.currentQuestion == null) {
@@ -114,10 +117,35 @@ class StudentQuizView extends StatelessWidget {
   }
 }
 
-class _QuizResultView extends StatelessWidget {
+class _QuizResultView extends StatefulWidget {
   final QuizViewModel vm;
+  final String lessonId;
 
-  const _QuizResultView({required this.vm});
+  const _QuizResultView({required this.vm, required this.lessonId});
+
+  @override
+  State<_QuizResultView> createState() => _QuizResultViewState();
+}
+
+class _QuizResultViewState extends State<_QuizResultView> {
+  @override
+  void initState() {
+    super.initState();
+    _saveProgress();
+  }
+
+  void _saveProgress() {
+    final authVm = context.read<AuthViewModel>();
+    final studentId = authVm.currentUser?.id;
+    if (studentId != null) {
+      context.read<ProgressViewModel>().updateLessonProgress(
+            studentId: studentId,
+            lessonId: widget.lessonId,
+            progressPercent: widget.vm.passed ? 100.0 : 50.0,
+            quizScore: widget.vm.scorePercent.toInt(),
+          );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,25 +156,25 @@ class _QuizResultView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              vm.passed ? Icons.celebration : Icons.sentiment_dissatisfied,
+              widget.vm.passed ? Icons.celebration : Icons.sentiment_dissatisfied,
               size: 80,
-              color: vm.passed ? Colors.green : Colors.orange,
+              color: widget.vm.passed ? Colors.green : Colors.orange,
             ),
             const SizedBox(height: 16),
             Text(
-              vm.passed ? 'Congratulations!' : 'Keep Trying!',
+              widget.vm.passed ? 'Congratulations!' : 'Keep Trying!',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'Score: ${vm.score} / ${vm.questions.length} (${vm.scorePercent.toStringAsFixed(0)}%)',
+              'Score: ${widget.vm.score} / ${widget.vm.questions.length} (${widget.vm.scorePercent.toStringAsFixed(0)}%)',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              vm.passed
+              widget.vm.passed
                   ? 'You passed the quiz!'
-                  : 'You need ${vm.currentQuiz?.passingScore}% to pass.',
+                  : 'You need ${widget.vm.currentQuiz?.passingScore}% to pass.',
               style: TextStyle(color: Colors.grey[600]),
             ),
             const SizedBox(height: 24),

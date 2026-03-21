@@ -18,7 +18,9 @@ import 'student/viewmodels/lesson_viewmodel.dart';
 import 'student/viewmodels/quiz_viewmodel.dart';
 import 'student/viewmodels/progress_viewmodel.dart';
 import 'student/viewmodels/download_viewmodel.dart';
+import 'student/viewmodels/progress_export_viewmodel.dart';
 import 'teacher/viewmodels/teacher_lesson_viewmodel.dart';
+import 'teacher/viewmodels/video_upload_viewmodel.dart';
 import 'teacher/viewmodels/quiz_creator_viewmodel.dart';
 import 'teacher/viewmodels/student_monitor_viewmodel.dart';
 import 'teacher/viewmodels/session_viewmodel.dart';
@@ -118,9 +120,11 @@ class ALSStudyCompanionApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => QuizViewModel()),
         ChangeNotifierProvider(create: (_) => ProgressViewModel()),
         ChangeNotifierProvider(create: (_) => DownloadViewModel()),
+        ChangeNotifierProvider(create: (_) => ProgressExportViewModel()),
 
         // Teacher ViewModels
         ChangeNotifierProvider(create: (_) => TeacherLessonViewModel()),
+        ChangeNotifierProvider(create: (_) => VideoUploadViewModel()),
         ChangeNotifierProvider(create: (_) => QuizCreatorViewModel()),
         ChangeNotifierProvider(create: (_) => StudentMonitorViewModel()),
         ChangeNotifierProvider(create: (_) => SessionViewModel()),

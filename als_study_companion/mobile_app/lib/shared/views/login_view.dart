@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_core/shared_core.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../viewmodels/sync_viewmodel.dart';
 import '../../student/views/student_dashboard_view.dart';
 import '../../teacher/views/teacher_dashboard_view.dart';
 import 'student_registration_view.dart';
@@ -55,6 +56,15 @@ class _LoginViewState extends State<LoginView> {
 
     if (!mounted) return;
     if (success) {
+      final role = authViewModel.currentRole;
+      if (role == null) {
+        _showError('Unable to determine user role');
+        return;
+      }
+      
+      // Trigger sync after login to ensure data is fresh
+      context.read<SyncViewModel>().syncAll();
+      
       _navigateAfterAuth(authViewModel);
     } else {
       _showError(authViewModel.errorMessage ?? 'Login failed');
@@ -102,6 +112,10 @@ class _LoginViewState extends State<LoginView> {
         _showError('Unable to determine user role');
         return;
       }
+      
+      // Trigger sync after login
+      context.read<SyncViewModel>().syncAll();
+      
       _navigateAfterAuth(authViewModel);
     } else {
       final err = authViewModel.errorMessage;

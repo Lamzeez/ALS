@@ -7,6 +7,7 @@ import '../viewmodels/teacher_lesson_viewmodel.dart';
 import '../viewmodels/student_monitor_viewmodel.dart';
 import '../viewmodels/quiz_creator_viewmodel.dart';
 import 'teacher_lessons_view.dart';
+import 'teacher_lesson_create_view.dart';
 import 'teacher_students_view.dart';
 import 'teacher_sessions_view.dart';
 import 'teacher_announcements_view.dart';
@@ -246,7 +247,11 @@ class _TeacherHomeTabState extends State<_TeacherHomeTab> {
                     label: 'New Lesson',
                     color: Colors.blue,
                     onTap: () {
-                      // TODO: Navigate to Lesson Creation
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TeacherLessonCreateView(),
+                        ),
+                      );
                     },
                   ),
                   _QuickActionCard(
