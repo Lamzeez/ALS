@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../viewmodels/admin_auth_viewmodel.dart';
 import '../viewmodels/analytics_viewmodel.dart';
 import '../viewmodels/center_management_viewmodel.dart';
+import '../viewmodels/user_management_viewmodel.dart';
+import '../users/user_management_page.dart';
+import 'package:shared_core/shared_core.dart';
 
 /// Admin dashboard overview page — shows live stats from Supabase.
 class AdminDashboardPage extends StatefulWidget {
@@ -19,16 +22,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AnalyticsViewModel>().loadAnalytics();
       context.read<CenterManagementViewModel>().loadCenters();
+      context.read<UserManagementViewModel>().loadUsers();
     });
   }
 
   void _refresh() {
     context.read<AnalyticsViewModel>().loadAnalytics();
     context.read<CenterManagementViewModel>().loadCenters();
+    context.read<UserManagementViewModel>().loadUsers();
   }
 
   @override
   Widget build(BuildContext context) {
+    final userVm = context.watch<UserManagementViewModel>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
@@ -86,6 +93,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           icon: Icons.person,
                           color: Colors.green,
                         ),
+                        if (userVm.pendingTeachers > 0)
+                          _DashboardCard(
+                            title: 'Pending Approvals',
+                            value: '${userVm.pendingTeachers}',
+                            icon: Icons.warning_amber,
+                            color: Colors.orange,
+                            onTap: () {
+                              userVm.filterByRole(UserRole.teacher);
+                              // Simple feedback
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Filter applied in User Management')),
+                              );
+                            },
+                          ),
                         _DashboardCard(
                           title: 'Total Lessons',
                           value: '${analyticsVm.totalLessons}',
@@ -120,7 +141,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         _DashboardCard(
                           title: 'Published Lessons',
                           value: '${analyticsVm.publishedLessons}',
-                          icon: Icons.publish,
+                          icon: Icons.amber,
                           color: Colors.amber,
                         ),
                       ],
@@ -208,48 +229,54 @@ class _DashboardCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
   const _DashboardCard({
     required this.title,
     required this.value,
     required this.icon,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Text(title, style: TextStyle(color: Colors.grey[600])),
-                ],
+                    Text(title, style: TextStyle(color: Colors.grey[600])),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

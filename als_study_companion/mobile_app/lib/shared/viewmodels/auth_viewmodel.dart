@@ -1,31 +1,36 @@
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_core/shared_core.dart';
-import '../../core/services/supabase_auth_service.dart';
+import 'package:backend_services/backend_services.dart' show SupabaseStorageService;
+import '../../core/services/firebase_auth_service.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/services/secure_credential_storage.dart';
-import '../../core/local/local_database.dart';
-import 'package:drift/drift.dart' as drift;
+import '../../core/database/database_helper.dart';
 
 /// Base ViewModel class for authentication state management.
 ///
 /// Follows MVVM pattern — View → ViewModel → Service → DataSource.
 class AuthViewModel extends ChangeNotifier {
-  final SupabaseAuthService _authService;
-  final LocalDatabase _localDb;
+  final FirebaseAuthService _authService;
+  final DatabaseHelper _db;
   final BiometricService _biometricService;
   final SecureCredentialStorage _credStorage;
+  final SupabaseStorageService _storageService = SupabaseStorageService();
 
   AuthViewModel({
-    required SupabaseAuthService authService,
-    required LocalDatabase localDb,
+    required FirebaseAuthService authService,
+    DatabaseHelper? db,
     BiometricService? biometricService,
     SecureCredentialStorage? credentialStorage,
   }) : _authService = authService,
-       _localDb = localDb,
+       _db = db ?? DatabaseHelper.instance,
        _biometricService = biometricService ?? BiometricService(),
        _credStorage = credentialStorage ?? SecureCredentialStorage() {
     _initAuthListener();
     _initBiometricState();
+    fetchCenters(); // Fetch centers on init
   }
 
   UserModel? _currentUser;
@@ -34,6 +39,7 @@ class AuthViewModel extends ChangeNotifier {
   String? _errorMessage;
   bool _isAuthenticated = false;
   bool _emailVerified = false;
+  List<AlsCenterModel> _centers = [];
 
   // Biometric state
   bool _isBiometricAvailable = false;
@@ -46,6 +52,7 @@ class AuthViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _isAuthenticated;
   bool get emailVerified => _emailVerified;
+  List<AlsCenterModel> get centers => _centers;
 
   /// Whether the device supports biometric authentication.
   bool get isBiometricAvailable => _isBiometricAvailable;
@@ -68,12 +75,101 @@ class AuthViewModel extends ChangeNotifier {
       !_currentUser!.teacherVerified;
 
   // ---------------------------------------------------------------------------
+  // Data Fetching
+  // ---------------------------------------------------------------------------
+
+  Future<void> fetchCenters() async {
+    debugPrint('Fetching ALS centers from Supabase...');
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase.from('als_centers').select();
+      debugPrint('Supabase response: $response');
+      
+      final data = List<Map<String, dynamic>>.from(response);
+      _centers = data.map((m) => AlsCenterModel.fromMap(m)).toList();
+      debugPrint('Loaded ${_centers.length} centers.');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error fetching centers: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Profile Update
+  // ---------------------------------------------------------------------------
+
+  Future<bool> updateProfilePicture(Uint8List imageBytes) async {
+    if (_currentUser == null) return false;
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // 1. Upload to Supabase Storage
+      final photoUrl = await _storageService.uploadProfileImage(
+        userId: _currentUser!.id,
+        imageBytes: imageBytes,
+      );
+
+      // 2. Update Supabase User Table
+      final supabase = Supabase.instance.client;
+      await supabase.from('users').update({
+        'profile_picture_url': photoUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', _currentUser!.id);
+
+      // 3. Update local state
+      _currentUser = _currentUser!.copyWith(profilePictureUrl: photoUrl);
+      await _cacheUserLocally(_currentUser!);
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update profile picture: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Verification methods
+  // ---------------------------------------------------------------------------
+
+  /// Refresh the current user's email verification status.
+  Future<bool> checkEmailVerified() async {
+    final verified = await _authService.checkEmailVerified();
+    _emailVerified = verified;
+    if (verified && _currentUser != null && !_currentUser!.emailVerified) {
+      await _authService.markEmailVerified(_currentUser!.id);
+      _currentUser = _currentUser!.copyWith(emailVerified: true);
+    }
+    notifyListeners();
+    return verified;
+  }
+
+  /// Resend verification email via Firebase.
+  Future<void> sendEmailVerification() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.sendEmailVerification();
+    } catch (e) {
+      _errorMessage = 'Failed to send verification email: ${e.toString()}';
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
   // Biometric helpers
   // ---------------------------------------------------------------------------
 
-  /// Loads device biometric availability and current enabled state.
-  /// Called once on construction so the login UI can show/hide the
-  /// auto-fill button immediately.
   Future<void> _initBiometricState() async {
     _isBiometricAvailable = await _biometricService.isAvailable();
     _isBiometricEnabled =
@@ -84,13 +180,6 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Prompts a biometric scan, then — on success — securely stores [email]
-  /// and [password] so they can be auto-filled later.
-  ///
-  /// Call this from the post-registration [BiometricSetupView] after the user
-  /// confirms they want to enable biometric login.
-  ///
-  /// Returns [true] when the scan succeeded and credentials were saved.
   Future<bool> setupBiometric({
     required String email,
     required String password,
@@ -106,18 +195,12 @@ class AuthViewModel extends ChangeNotifier {
     return true;
   }
 
-  /// Disables biometric auto-fill and removes the stored credentials.
   Future<void> disableBiometric() async {
     await _credStorage.clearCredentials();
     _isBiometricEnabled = false;
     notifyListeners();
   }
 
-  /// Prompts the user for biometric authentication.
-  ///
-  /// On success, returns the saved credentials so the login form can be
-  /// auto-filled. Returns [null] if the scan fails, the user cancels, or
-  /// no credentials are stored.
   Future<({String email, String password})?> biometricAutoFill() async {
     if (!_isBiometricEnabled) return null;
 
@@ -129,17 +212,15 @@ class AuthViewModel extends ChangeNotifier {
     return await _credStorage.getCredentials();
   }
 
-  /// Refreshes [isBiometricEnabled] — useful after the setup view completes.
   Future<void> refreshBiometricState() async {
     _isBiometricEnabled =
         _isBiometricAvailable && await _credStorage.isEnabled();
     notifyListeners();
   }
 
-  /// Initialize auth state listener
   void _initAuthListener() {
-    _authService.authStateChanges.listen((authState) async {
-      if (authState.session != null) {
+    _authService.authStateChanges.listen((firebaseUser) async {
+      if (firebaseUser != null) {
         await _loadCurrentUser();
       } else {
         _currentUser = null;
@@ -148,12 +229,9 @@ class AuthViewModel extends ChangeNotifier {
         notifyListeners();
       }
     });
-
-    // Load initial user if already signed in
     _loadCurrentUser();
   }
 
-  /// Load current user from service
   Future<void> _loadCurrentUser() async {
     try {
       final user = await _authService.getCurrentUserModel();
@@ -161,8 +239,7 @@ class AuthViewModel extends ChangeNotifier {
         _currentUser = user;
         _currentRole = user.role;
         _isAuthenticated = true;
-
-        // Cache user in local database
+        _emailVerified = user.emailVerified;
         await _cacheUserLocally(user);
         notifyListeners();
       }
@@ -171,7 +248,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  /// Sign in with email and password.
   Future<bool> signIn(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
@@ -188,8 +264,6 @@ class AuthViewModel extends ChangeNotifier {
         _currentRole = user.role;
         _isAuthenticated = true;
         _emailVerified = user.emailVerified;
-
-        // Cache user in local database for offline access
         await _cacheUserLocally(user);
 
         _isLoading = false;
@@ -209,19 +283,15 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  /// Sign out the current user.
   Future<void> signOut() async {
     _isLoading = true;
     notifyListeners();
 
     try {
       await _authService.signOut();
-
-      // Clear local user cache
       if (_currentUser != null) {
-        await _localDb.deleteUserById(_currentUser!.id);
+        await _db.delete(DbConstants.tableUsers, _currentUser!.id);
       }
-
       _currentUser = null;
       _currentRole = null;
       _isAuthenticated = false;
@@ -233,51 +303,6 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Register a new user.
-  Future<bool> register({
-    required String email,
-    required String password,
-    required String fullName,
-    required UserRole role,
-  }) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final user = await _authService.registerWithEmailAndPassword(
-        email: email,
-        password: password,
-        fullName: fullName,
-        role: role,
-      );
-
-      if (user != null) {
-        _currentUser = user;
-        _currentRole = user.role;
-        _isAuthenticated = true;
-
-        // Cache user in local database
-        await _cacheUserLocally(user);
-
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'Registration failed';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = _formatErrorMessage(e.toString());
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Register a new student.
   Future<bool> registerStudent({
     required String email,
     required String password,
@@ -314,14 +339,15 @@ class AuthViewModel extends ChangeNotifier {
 
       _currentUser = user;
       _currentRole = UserRole.student;
-      _isAuthenticated = true;
-      _emailVerified = false;
+      _isAuthenticated = _authService.currentUser != null;
+      _emailVerified = user.emailVerified;
       await _cacheUserLocally(user);
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
+      debugPrint('AuthViewModel: registerStudent ERROR: $e');
       _errorMessage = _formatErrorMessage(e.toString());
       _isLoading = false;
       notifyListeners();
@@ -329,13 +355,13 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  /// Register a new teacher.
   Future<bool> registerTeacher({
     required String email,
     required String password,
     required String firstName,
     required String lastName,
     required String phoneNumber,
+    required String employeeId,
     String? alsCenterId,
   }) async {
     _isLoading = true;
@@ -349,19 +375,21 @@ class AuthViewModel extends ChangeNotifier {
         firstName: firstName,
         lastName: lastName,
         phoneNumber: phoneNumber,
+        employeeId: employeeId,
         alsCenterId: alsCenterId,
       );
 
       _currentUser = user;
       _currentRole = UserRole.teacher;
-      _isAuthenticated = true;
-      _emailVerified = false;
+      _isAuthenticated = _authService.currentUser != null;
+      _emailVerified = user.emailVerified;
       await _cacheUserLocally(user);
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
+      debugPrint('AuthViewModel: registerTeacher ERROR: $e');
       _errorMessage = _formatErrorMessage(e.toString());
       _isLoading = false;
       notifyListeners();
@@ -369,106 +397,40 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  /// Check if the current user's email is verified (Supabase).
-  /// If verified, also marks the flag in the Supabase users table.
-  Future<bool> checkEmailVerified() async {
-    final verified = await _authService.checkEmailVerified();
-    _emailVerified = verified;
-    if (verified && _currentUser != null && !_currentUser!.emailVerified) {
-      await _authService.markEmailVerified(_currentUser!.id);
-      _currentUser = _currentUser!.copyWith(emailVerified: true);
-    }
-    notifyListeners();
-    return verified;
-  }
-
-  /// Resend email verification link (Supabase).
-  Future<void> sendEmailVerification() async {
+  Future<void> sendPasswordResetEmail(String email) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      await _authService.sendEmailVerification();
+      await _authService.sendPasswordResetEmail(email);
     } catch (e) {
-      _errorMessage = 'Failed to send verification email: ${e.toString()}';
+      _errorMessage = 'Failed to send password reset email: ${e.toString()}';
     }
 
     _isLoading = false;
     notifyListeners();
   }
 
-  /// Cache user in local database for offline access
   Future<void> _cacheUserLocally(UserModel user) async {
     try {
-      await _localDb.upsertUser(
-        UsersCompanion(
-          id: drift.Value(user.id),
-          email: drift.Value(user.email),
-          fullName: drift.Value(user.fullName),
-          role: drift.Value(user.role.name),
-          profilePictureUrl: drift.Value(user.profilePictureUrl),
-          alsCenterId: drift.Value(user.alsCenterId),
-          isActive: drift.Value(user.isActive),
-          createdAt: drift.Value(user.createdAt),
-          updatedAt: drift.Value(user.updatedAt),
-          firstName: drift.Value(user.firstName),
-          lastName: drift.Value(user.lastName),
-          studentIdNumber: drift.Value(user.studentIdNumber),
-          dateOfBirth: drift.Value(user.dateOfBirth),
-          age: drift.Value(user.age),
-          phoneNumber: drift.Value(user.phoneNumber),
-          occupation: drift.Value(user.occupation),
-          lastSchoolAttended: drift.Value(user.lastSchoolAttended),
-          lastYearAttended: drift.Value(user.lastYearAttended),
-          emailVerified: drift.Value(user.emailVerified),
-          teacherVerified: drift.Value(user.teacherVerified),
-        ),
-      );
+      await _db.insert(DbConstants.tableUsers, user.toMap());
     } catch (e) {
       debugPrint('Error caching user locally: $e');
     }
   }
 
-  /// Format error messages to be user-friendly
   String _formatErrorMessage(String error) {
-    if (error.contains('Invalid login credentials') ||
-        error.contains('invalid_credentials')) {
+    if (error.contains('user-not-found') || error.contains('wrong-password') || error.contains('invalid-credential')) {
       return 'Invalid email or password';
-    } else if (error.contains('Email not confirmed') ||
-        error.contains('email_not_confirmed')) {
-      return 'Please verify your email address before signing in';
-    } else if (error.contains('User already registered') ||
-        error.contains('already registered') ||
-        error.contains('already been registered')) {
+    } else if (error.contains('email-already-in-use')) {
       return 'An account with this email already exists';
-    } else if (error.contains('Password should be at least') ||
-        error.contains('password') && error.contains('characters')) {
-      return 'Password must be at least 8 characters';
-    } else if (error.contains('network_error') ||
-        error.contains('ApiException: 7')) {
-      return 'Network error during Google Sign-In. '
-          'Ensure the app is registered in Google Cloud Console '
-          'with the correct SHA-1 fingerprint.';
-    } else if (error.contains('Google Sign-In is not configured')) {
-      return 'Google Sign-In is not set up. Contact the app administrator.';
-    } else if (error.contains('no ID token')) {
-      return 'Google Sign-In failed: could not obtain authentication token.';
-    } else if (error.contains('Full name must be at least')) {
-      return 'Please enter your full name (at least 2 characters).';
-    } else if (error.contains('Invalid email format')) {
-      return 'The email address format is invalid.';
-    } else if (error.contains('row-level security') ||
-        error.contains('violates row-level')) {
-      return 'Account creation failed due to a permissions error. '
-          'Please try again or contact support.';
+    } else if (error.contains('weak-password')) {
+      return 'The password is too weak';
+    } else if (error.contains('network-request-failed')) {
+      return 'Network error. Please check your connection';
     }
-    // Surface the raw message in debug builds so developers see the real error.
-    assert(() {
-      debugPrint('[AuthViewModel] Unhandled error: $error');
-      return true;
-    }());
-    return 'An error occurred. Please try again.';
+    return 'Error: $error';
   }
 
   void clearError() {
@@ -476,7 +438,6 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sign in with Google. [role] is used only for brand-new accounts.
   Future<bool> signInWithGoogle({required UserRole role}) async {
     _isLoading = true;
     _errorMessage = null;
@@ -494,7 +455,6 @@ class AuthViewModel extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        // User cancelled the Google picker
         _isLoading = false;
         notifyListeners();
         return false;

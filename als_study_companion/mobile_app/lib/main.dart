@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:backend_services/backend_services.dart'
-    show SupabaseDatabaseService, SyncService;
+show SupabaseDatabaseService, SyncService;
 import 'core/services/connectivity_service.dart';
 import 'core/database/database_helper.dart';
-import 'core/local/local_database.dart';
-import 'core/services/supabase_auth_service.dart';
+import 'core/services/firebase_auth_service.dart';
 import 'core/services/biometric_service.dart';
 import 'core/services/secure_credential_storage.dart';
+import 'core/sync/background_sync_service.dart';
+import 'firebase_options.dart';
 import 'shared/viewmodels/auth_viewmodel.dart';
 import 'shared/viewmodels/sync_viewmodel.dart';
 import 'student/viewmodels/lesson_viewmodel.dart';
@@ -40,7 +42,18 @@ void main() async {
     );
   }
 
-  // Initialize Supabase
+  // Initialize Firebase
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } catch (e) {
+    debugPrint('Firebase initialization failed: $e');
+  }
+
+  // Initialize Supabase (keeping for database access)
   await Supabase.initialize(
     url:
         dotenv.env['SUPABASE_URL'] ??
@@ -50,6 +63,9 @@ void main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4a25xY29hYWVvamJkd3RxZW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjUzMzQsImV4cCI6MjA4ODY0MTMzNH0.6IPneO_0zNV5Z-dzRF58fRU9DbY7lXRri2AkPK-5Ap0',
     debug: false,
   );
+
+  // Initialize Background Sync
+  await BackgroundSyncService.initialize();
 
   runApp(const ALSStudyCompanionApp());
 }
@@ -66,14 +82,8 @@ class ALSStudyCompanionApp extends StatelessWidget {
           create: (_) => ConnectivityService(),
           dispose: (_, service) => service.dispose(),
         ),
-        Provider<LocalDatabase>(
-          create: (_) => LocalDatabase(),
-          dispose: (_, db) => db.close(),
-        ),
-        Provider<SupabaseAuthService>(
-          create: (context) => SupabaseAuthService(
-            googleWebClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
-          ),
+        Provider<FirebaseAuthService>(
+          create: (_) => FirebaseAuthService(),
         ),
         Provider<BiometricService>(create: (_) => BiometricService()),
         Provider<SecureCredentialStorage>(
@@ -93,8 +103,8 @@ class ALSStudyCompanionApp extends StatelessWidget {
         // Shared ViewModels
         ChangeNotifierProvider(
           create: (context) => AuthViewModel(
-            authService: context.read<SupabaseAuthService>(),
-            localDb: context.read<LocalDatabase>(),
+            authService: context.read<FirebaseAuthService>(),
+            db: DatabaseHelper.instance,
             biometricService: context.read<BiometricService>(),
             credentialStorage: context.read<SecureCredentialStorage>(),
           ),

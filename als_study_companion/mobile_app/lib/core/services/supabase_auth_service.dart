@@ -102,10 +102,12 @@ class SupabaseAuthService {
           'last_name': lastName,
           'student_id_number': studentIdNumber,
           'phone_number': phoneNumber,
-          'occupation': ?occupation,
-          'last_school_attended': ?lastSchoolAttended,
-          'last_year_attended': ?lastYearAttended,
-          'als_center_id': ?alsCenterId,
+          'occupation': occupation,
+          'last_school_attended': lastSchoolAttended,
+          'last_year_attended': lastYearAttended,
+          'als_center_id': alsCenterId,
+          'date_of_birth': dateOfBirth.toIso8601String(),
+          'age': age,
         },
       );
     } catch (e) {
@@ -116,13 +118,11 @@ class SupabaseAuthService {
     userMap['id'] = res.user!.id;
 
     // 2. If we have a live session (email confirmation disabled), also upsert
-    //    from the client so age and date_of_birth (not in meta trigger) are set.
+    //    from the client.
     if (res.session != null) {
       try {
         await _client.from('users').upsert(userMap);
       } catch (e) {
-        // Profile may have been created by the trigger; sign out so the user
-        // doesn't get stuck in a broken authenticated state.
         await _client.auth.signOut();
         rethrow;
       }
@@ -173,7 +173,7 @@ class SupabaseAuthService {
           'first_name': firstName,
           'last_name': lastName,
           'phone_number': phoneNumber,
-          'als_center_id': ?alsCenterId,
+          'als_center_id': alsCenterId,
         },
       );
     } catch (e) {
@@ -205,7 +205,15 @@ class SupabaseAuthService {
     String? alsCenterId,
   }) async {
     try {
-      final res = await _client.auth.signUp(email: email, password: password);
+      final res = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'full_name': fullName,
+          'role': role.name,
+          'als_center_id': alsCenterId,
+        },
+      );
 
       if (res.user == null) return null;
 
@@ -219,10 +227,14 @@ class SupabaseAuthService {
         'is_active': true,
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
+        'email_verified': false,
+        'teacher_verified': false,
       };
 
-      // Insert into 'users' table
-      await _client.from('users').insert(userMap);
+      // If we have a session, upsert to ensure all fields are set
+      if (res.session != null) {
+        await _client.from('users').upsert(userMap);
+      }
 
       return UserModel.fromMap(Map<String, dynamic>.from(userMap));
     } catch (e) {

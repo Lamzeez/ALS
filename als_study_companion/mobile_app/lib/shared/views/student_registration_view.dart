@@ -30,6 +30,7 @@ class _StudentRegistrationViewState extends State<StudentRegistrationView> {
 
   DateTime? _dateOfBirth;
   int? _age;
+  String? _selectedCenterId;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
@@ -100,6 +101,7 @@ class _StudentRegistrationViewState extends State<StudentRegistrationView> {
       lastYearAttended: _lastYearCtrl.text.trim().isEmpty
           ? null
           : _lastYearCtrl.text.trim(),
+      alsCenterId: _selectedCenterId,
     );
 
     if (!mounted) return;
@@ -286,6 +288,36 @@ class _StudentRegistrationViewState extends State<StudentRegistrationView> {
                   ),
                   validator: (v) =>
                       Validators.validateConfirmPassword(v, _passwordCtrl.text),
+                ),
+                const SizedBox(height: 16),
+
+                // ALS Center Dropdown
+                Consumer<AuthViewModel>(
+                  builder: (context, authVm, child) {
+                    if (authVm.centers.isEmpty) {
+                      return OutlinedButton.icon(
+                        onPressed: () => authVm.fetchCenters(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Loading Centers... Tap to retry'),
+                      );
+                    }
+                    return DropdownButtonFormField<String>(
+                      value: _selectedCenterId,
+                      decoration: const InputDecoration(
+                        labelText: 'ALS Center *',
+                        prefixIcon: Icon(Icons.location_on_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      items: authVm.centers.map((center) {
+                        return DropdownMenuItem(
+                          value: center.id,
+                          child: Text(center.name),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setState(() => _selectedCenterId = val),
+                      validator: (v) => Validators.validateRequired(v, 'ALS Center'),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
 

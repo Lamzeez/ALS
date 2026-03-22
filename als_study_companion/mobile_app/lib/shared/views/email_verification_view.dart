@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_core/shared_core.dart';
@@ -7,8 +6,7 @@ import '../../student/views/student_dashboard_view.dart';
 import '../../teacher/views/teacher_dashboard_view.dart';
 import 'biometric_setup_view.dart';
 
-/// Waiting screen shown after registration — polls Firebase to check if
-/// the user has verified their email. Offers a resend button.
+/// Screen for Firebase email verification.
 class EmailVerificationView extends StatefulWidget {
   const EmailVerificationView({super.key});
 
@@ -17,38 +15,25 @@ class EmailVerificationView extends StatefulWidget {
 }
 
 class _EmailVerificationViewState extends State<EmailVerificationView> {
-  Timer? _pollTimer;
-  bool _checking = false;
   bool _resendCooldown = false;
+  bool _isChecking = false;
 
   @override
   void initState() {
     super.initState();
-    // Poll every 3 seconds for email verification
-    _pollTimer = Timer.periodic(
-      const Duration(seconds: 3),
-      (_) => _checkVerification(),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pollTimer?.cancel();
-    super.dispose();
+    // Initial verification check
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkVerification();
+    });
   }
 
   Future<void> _checkVerification() async {
-    if (_checking) return;
-    _checking = true;
-
+    setState(() => _isChecking = true);
     final authVm = context.read<AuthViewModel>();
-    final verified = await authVm.checkEmailVerified();
+    final isVerified = await authVm.checkEmailVerified();
+    setState(() => _isChecking = false);
 
-    _checking = false;
-    if (!mounted) return;
-
-    if (verified) {
-      _pollTimer?.cancel();
+    if (isVerified && mounted) {
       _navigateToDashboard(authVm.currentRole ?? UserRole.student);
     }
   }
@@ -57,25 +42,31 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     if (_resendCooldown) return;
 
     setState(() => _resendCooldown = true);
-
     final authVm = context.read<AuthViewModel>();
     await authVm.sendEmailVerification();
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Verification email resent!')));
+    if (authVm.errorMessage != null) {
+      _showError(authVm.errorMessage!);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verification email resent! Please check your inbox.')),
+      );
+    }
 
-    // 30-second cooldown before allowing another resend
-    Future.delayed(const Duration(seconds: 30), () {
+    Future.delayed(const Duration(seconds: 60), () {
       if (mounted) setState(() => _resendCooldown = false);
     });
   }
 
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+    );
+  }
+
   void _navigateToDashboard(UserRole role) {
-    // If the device supports biometrics and the user has NOT yet enabled
-    // biometric login, offer the setup step before going to the dashboard.
     final authVm = context.read<AuthViewModel>();
     if (authVm.isBiometricAvailable && !authVm.isBiometricEnabled) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -110,65 +101,55 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     final authVm = context.watch<AuthViewModel>();
 
     return Scaffold(
+      appBar: AppBar(title: const Text('Verify Email')),
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.mark_email_unread_outlined,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              const Icon(Icons.mark_email_unread_outlined, size: 80, color: Colors.blue),
+              const SizedBox(height: 24),
+              Text(
+                'Verify Your Email',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'We sent a verification link to\n${authVm.currentUser?.email ?? ""}\n\nPlease click the link in the email to continue.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 32),
+              
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  onPressed: _isChecking ? null : _checkVerification,
+                  child: _isChecking 
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text('I\'ve Verified My Email'),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Verify your email',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'We sent a verification link to\n${authVm.currentUser?.email ?? ''}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[600], height: 1.5),
-                ),
-                const SizedBox(height: 32),
-                const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Waiting for verification…',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                ),
-                const SizedBox(height: 32),
-                OutlinedButton.icon(
-                  onPressed: _resendCooldown ? null : _resendEmail,
-                  icon: const Icon(Icons.send_outlined),
-                  label: Text(
-                    _resendCooldown
-                        ? 'Resend (wait 30s)'
-                        : 'Resend Verification Email',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () async {
-                    _pollTimer?.cancel();
-                    final nav = Navigator.of(context);
-                    await authVm.signOut();
-                    if (!mounted) return;
-                    nav.popUntil((route) => route.isFirst);
-                  },
-                  child: const Text('Back to Login'),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 24),
+
+              TextButton(
+                onPressed: _resendCooldown ? null : _resendEmail,
+                child: Text(_resendCooldown ? 'Resend email in 60s' : 'Resend Verification Email'),
+              ),
+              
+              TextButton(
+                onPressed: () async {
+                  await authVm.signOut();
+                  if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+                },
+                child: const Text('Back to Login'),
+              ),
+            ],
           ),
         ),
       ),

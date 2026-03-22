@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../shared/viewmodels/auth_viewmodel.dart';
 import '../../shared/viewmodels/sync_viewmodel.dart';
+import '../../shared/views/profile_view.dart';
+import '../viewmodels/teacher_lesson_viewmodel.dart';
+import '../viewmodels/student_monitor_viewmodel.dart';
+import '../viewmodels/quiz_creator_viewmodel.dart';
 import 'teacher_lessons_view.dart';
 import 'teacher_lesson_create_view.dart';
 import 'teacher_students_view.dart';
 import 'teacher_sessions_view.dart';
 import 'teacher_announcements_view.dart';
+import 'teacher_session_create_view.dart';
+import 'teacher_announcement_create_view.dart';
 
 /// Main dashboard for teacher users.
 class TeacherDashboardView extends StatefulWidget {
@@ -65,145 +72,252 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   }
 }
 
-class _TeacherHomeTab extends StatelessWidget {
+class _TeacherHomeTab extends StatefulWidget {
   const _TeacherHomeTab();
 
   @override
+  State<_TeacherHomeTab> createState() => _TeacherHomeTabState();
+}
+
+class _TeacherHomeTabState extends State<_TeacherHomeTab> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthViewModel>();
+      if (auth.currentUser != null) {
+        context.read<TeacherLessonViewModel>().loadLessons(auth.currentUser!.id);
+        context.read<StudentMonitorViewModel>().loadStudents(auth.currentUser!.id);
+      }
+    });
+  }
+
+  void _handleLogout() async {
+    final authVm = context.read<AuthViewModel>();
+    await authVm.signOut();
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authVm = context.watch<AuthViewModel>();
+    final syncVm = context.watch<SyncViewModel>();
+    final lessonVm = context.watch<TeacherLessonViewModel>();
+    final studentVm = context.watch<StudentMonitorViewModel>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Teacher Dashboard'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.sync),
-            onPressed: () async {
-              final syncVm = context.read<SyncViewModel>();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Syncing data...')),
-              );
-              await syncVm.syncAll();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      syncVm.errorMessage ?? 'Sync completed successfully',
+            icon: syncVm.isSyncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+            onPressed: () => syncVm.syncAll(),
+          ),
+          PopupMenuButton<String>(
+            icon: CircleAvatar(
+              radius: 14,
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              child: authVm.currentUser?.profilePictureUrl != null
+                  ? ClipOval(
+                      child: Image.network(
+                        authVm.currentUser!.profilePictureUrl!,
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Icon(
+                      Icons.person,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    backgroundColor:
-                        syncVm.errorMessage != null ? Colors.red : Colors.green,
+            ),
+            onSelected: (value) {
+              if (value == 'profile') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfileView()),
+                );
+              } else if (value == 'logout') {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _handleLogout();
+                        },
+                        child: const Text('Logout',
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
                   ),
                 );
               }
             },
-          ),
-          IconButton(icon: const Icon(Icons.person_outline), onPressed: () {}),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'profile',
+                child: Row(
                   children: [
-                    Text(
-                      'Welcome, Teacher!',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Manage your classes and monitor student progress.',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
+                    Icon(Icons.person_outline, size: 20),
+                    SizedBox(width: 8),
+                    Text('My Profile'),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Quick Actions Grid
-            Text(
-              'Quick Actions',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.5,
-              children: [
-                _QuickActionCard(
-                  icon: Icons.add_circle_outline,
-                  label: 'New Lesson',
-                  color: Colors.blue,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const TeacherLessonCreateView(),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Logout', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          if (authVm.currentUser != null) {
+            await lessonVm.loadLessons(authVm.currentUser!.id);
+            await studentVm.loadStudents(authVm.currentUser!.id);
+          }
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome, ${authVm.currentUser?.fullName ?? "Teacher"}!',
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                    );
-                  },
+                      const SizedBox(height: 8),
+                      Text(
+                        'Manage your classes and monitor student progress.',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
                 ),
-                _QuickActionCard(
-                  icon: Icons.quiz_outlined,
-                  label: 'Create Quiz',
-                  color: Colors.green,
-                  onTap: () {},
-                ),
-                _QuickActionCard(
-                  icon: Icons.calendar_today,
-                  label: 'Schedule',
-                  color: Colors.orange,
-                  onTap: () {},
-                ),
-                _QuickActionCard(
-                  icon: Icons.campaign,
-                  label: 'Announce',
-                  color: Colors.purple,
-                  onTap: () {},
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 16),
 
-            // Stats
-            Text('Overview', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatTile(
-                    label: 'Students',
-                    value: '0',
-                    icon: Icons.people,
+              // Quick Actions Grid
+              Text(
+                'Quick Actions',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.5,
+                children: [
+                  _QuickActionCard(
+                    icon: Icons.add_circle_outline,
+                    label: 'New Lesson',
+                    color: Colors.blue,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TeacherLessonCreateView(),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatTile(
-                    label: 'Lessons',
-                    value: '0',
-                    icon: Icons.book,
+                  _QuickActionCard(
+                    icon: Icons.quiz_outlined,
+                    label: 'Create Quiz',
+                    color: Colors.green,
+                    onTap: () {
+                      // TODO: Navigate to Quiz Creation
+                    },
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatTile(
-                    label: 'Quizzes',
-                    value: '0',
-                    icon: Icons.quiz,
+                  _QuickActionCard(
+                    icon: Icons.calendar_today,
+                    label: 'Schedule',
+                    color: Colors.orange,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TeacherSessionCreateView()),
+                      );
+                    },
                   ),
-                ),
-              ],
-            ),
-          ],
+                  _QuickActionCard(
+                    icon: Icons.campaign,
+                    label: 'Announce',
+                    color: Colors.purple,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TeacherAnnouncementCreateView()),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Stats
+              Text('Overview', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatTile(
+                      label: 'Students',
+                      value: studentVm.students.length.toString(),
+                      icon: Icons.people,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatTile(
+                      label: 'Lessons',
+                      value: lessonVm.lessons.length.toString(),
+                      icon: Icons.book,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatTile(
+                      label: 'Quizzes',
+                      value: '0', // TODO: Implement overall quiz count
+                      icon: Icons.quiz,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
