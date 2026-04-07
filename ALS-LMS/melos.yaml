@@ -1,0 +1,38 @@
+name: als_lms
+
+packages:
+  - apps/*
+  - packages/*
+
+scripts:
+  analyze:
+    exec: dart analyze .
+    description: Run static analysis on all packages
+
+  test:
+    exec: flutter test
+    description: Run tests in all packages
+    packageFilters:
+      flutter: true
+
+  clean:
+    exec: flutter clean
+    description: Clean build artifacts in all packages
+
+  get:
+    exec: dart pub get
+    description: Get dependencies for all packages
+
+  build:android:
+    exec: flutter build apk --release
+    description: Build Android APK
+    packageFilters:
+      scope: "student_phone"
+
+  generate:
+    exec: dart run build_runner build --delete-conflicting-outputs
+    description: Run code generation (json_serializable, etc.)
+
+command:
+  bootstrap:
+    usePubspecOverrides: true

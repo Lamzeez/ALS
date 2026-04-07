@@ -1,0 +1,17 @@
+name: shared_ui
+description: Shared UI components and design system for ALS-LMS
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
