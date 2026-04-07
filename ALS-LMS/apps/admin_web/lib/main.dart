@@ -104,9 +104,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
       // Enrollments
       try {
-        final enrollments = await client
-            .from('course_enrollments')
-            .select('id');
+        final enrollments =
+            await client.from('course_enrollments').select('id');
         _totalEnrollments = (enrollments as List).length;
       } catch (_) {
         _totalEnrollments = 0;
@@ -797,11 +796,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  (isActive
-                                          ? AlsColors.success
-                                          : AlsColors.error)
-                                      .withValues(alpha: 0.1),
+                              color: (isActive
+                                      ? AlsColors.success
+                                      : AlsColors.error)
+                                  .withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -835,9 +833,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                     ),
                                     const PopupMenuDivider(),
                                     PopupMenuItem(
-                                      value: isActive
-                                          ? 'deactivate'
-                                          : 'activate',
+                                      value:
+                                          isActive ? 'deactivate' : 'activate',
                                       child: Text(
                                         isActive ? 'Deactivate' : 'Activate',
                                       ),
@@ -894,11 +891,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color:
-                        (_killSwitchActive
-                                ? AlsColors.error
-                                : AlsColors.textHint)
-                            .withValues(alpha: 0.1),
+                    color: (_killSwitchActive
+                            ? AlsColors.error
+                            : AlsColors.textHint)
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -917,8 +913,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       Text(
                         'Kill Switch',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -984,11 +980,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color:
-                        (_maintenanceActive
-                                ? AlsColors.warning
-                                : AlsColors.textHint)
-                            .withValues(alpha: 0.1),
+                    color: (_maintenanceActive
+                            ? AlsColors.warning
+                            : AlsColors.textHint)
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -1007,8 +1002,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       Text(
                         'Maintenance Mode',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -1147,9 +1142,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 'No learning centers added yet. Click "Add Center" to create one.',
               )
             : Column(
-                children: _centers
-                    .map((center) => _buildCenterCard(center))
-                    .toList(),
+                children:
+                    _centers.map((center) => _buildCenterCard(center)).toList(),
               ),
       ],
     );
@@ -1241,38 +1235,199 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   // ────────────────────────────────────────────────────────────
-  // PAGE: Courses (Read-only for School Admin)
+  // PAGE: Courses
   // ────────────────────────────────────────────────────────────
   Widget _buildCoursesPage() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('All Courses', style: Theme.of(context).textTheme.titleMedium),
+        Row(
+          children: [
+            Text('All Courses', style: Theme.of(context).textTheme.titleMedium),
+            const Spacer(),
+            ElevatedButton.icon(
+              onPressed: _showCreateCourseDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Create Course'),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         Text(
-          'Read-only view of all courses in your district/region.',
+          'Manage courses, modules, and lessons.',
           style: TextStyle(color: AlsColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 16),
         _courses.isEmpty
             ? _buildEmptyState(
-                'No courses yet. Courses will appear here once teachers create them.',
+                'No courses yet. Click "Create Course" to add one.',
               )
-            : _buildDataTable(
-                ['Title', 'Strand', 'Published', 'QR Code', 'PIN'],
-                _courses
-                    .map(
-                      (c) => [
-                        c['title']?.toString() ?? 'N/A',
-                        (c['strand']?.toString() ?? '').replaceAll('_', ' '),
-                        c['is_published'] == true ? 'Yes' : 'No',
-                        c['qr_code']?.toString() ?? 'N/A',
-                        c['pin_code']?.toString() ?? 'N/A',
-                      ],
-                    )
-                    .toList(),
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _courses.length,
+                itemBuilder: (context, index) {
+                  final course = _courses[index];
+                  return _buildCourseManagementCard(course);
+                },
               ),
       ],
+    );
+  }
+
+  Widget _buildCourseManagementCard(Map<String, dynamic> course) {
+    final title = course['title']?.toString() ?? 'Untitled';
+    final strand = (course['strand']?.toString() ?? '').replaceAll('_', ' ');
+    final isPublished = course['is_published'] == true;
+    final courseId = course['id'] as String;
+    final pinCode = course['pin_code']?.toString() ?? 'N/A';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ExpansionTile(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AlsColors.primarySurface,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(strand,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AlsColors.primary,
+                      fontWeight: FontWeight.w500)),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              isPublished ? Icons.visibility : Icons.visibility_off,
+              size: 14,
+              color: isPublished ? AlsColors.success : AlsColors.textHint,
+            ),
+            const SizedBox(width: 4),
+            Text(isPublished ? 'Published' : 'Draft',
+                style: TextStyle(fontSize: 11, color: AlsColors.textSecondary)),
+            const SizedBox(width: 12),
+            Text('PIN: $pinCode',
+                style: TextStyle(fontSize: 11, color: AlsColors.textSecondary)),
+          ],
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _showAddModuleDialog(courseId),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Module'),
+                  style: ElevatedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: CourseService().getModules(courseId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final modules = snapshot.data ?? [];
+              if (modules.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('No modules yet. Add one above.'),
+                );
+              }
+              return Column(
+                children: modules.map((module) {
+                  final moduleTitle =
+                      module['title']?.toString() ?? 'Untitled Module';
+                  final moduleId = module['id'] as String;
+                  return ExpansionTile(
+                    leading: const Icon(Icons.view_module, size: 20),
+                    title:
+                        Text(moduleTitle, style: const TextStyle(fontSize: 14)),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 4),
+                        child: Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _showAddLessonDialog(moduleId),
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text('Add Lesson'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                textStyle: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      FutureBuilder<List<Map<String, dynamic>>>(
+                        future: CourseService().getLessons(moduleId),
+                        builder: (context, lessonSnap) {
+                          if (lessonSnap.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Center(
+                                  child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2))),
+                            );
+                          }
+                          final lessons = lessonSnap.data ?? [];
+                          if (lessons.isEmpty) {
+                            return const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Text('No lessons yet.',
+                                  style: TextStyle(fontSize: 12)),
+                            );
+                          }
+                          return Column(
+                            children: lessons.map((lesson) {
+                              return ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.article, size: 18),
+                                title: Text(
+                                  lesson['title']?.toString() ??
+                                      'Untitled Lesson',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                subtitle: Text(
+                                  (lesson['content_type']?.toString() ?? 'text')
+                                      .replaceAll('_', ' '),
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -1399,8 +1554,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   Text(
                     'No pending approvals',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AlsColors.textSecondary,
-                    ),
+                          color: AlsColors.textSecondary,
+                        ),
                   ),
                 ],
               ),
@@ -1475,8 +1630,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final client = SupabaseConfig.client;
       await client
           .from('profiles')
-          .update({'approval_status': 'approved'})
-          .eq('id', teacherId);
+          .update({'approval_status': 'approved'}).eq('id', teacherId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1527,8 +1681,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final client = SupabaseConfig.client;
       await client
           .from('profiles')
-          .update({'approval_status': 'rejected'})
-          .eq('id', teacherId);
+          .update({'approval_status': 'rejected'}).eq('id', teacherId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1772,9 +1925,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _killSwitchActive
-                  ? AlsColors.secondary
-                  : AlsColors.error,
+              backgroundColor:
+                  _killSwitchActive ? AlsColors.secondary : AlsColors.error,
             ),
             child: Text(_killSwitchActive ? 'Deactivate' : 'Activate'),
           ),
@@ -1930,8 +2082,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty ||
-                  regionCtrl.text.trim().isEmpty)
-                return;
+                  regionCtrl.text.trim().isEmpty) return;
               try {
                 await _centerService.createCenter(
                   name: nameCtrl.text.trim(),
@@ -2400,10 +2551,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
         // For testing, we find the first lesson ID if it exists, or use a dummy.
         String lessonId;
-        final lessons = await SupabaseConfig.client
-            .from('lessons')
-            .select('id')
-            .limit(1);
+        final lessons =
+            await SupabaseConfig.client.from('lessons').select('id').limit(1);
         if ((lessons as List).isNotEmpty) {
           lessonId = lessons.first['id'];
         } else {
@@ -2474,6 +2623,306 @@ class _AdminDashboardState extends State<AdminDashboard> {
       default:
         return AlsColors.textSecondary;
     }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Course / Module / Lesson Creation Dialogs
+  // ────────────────────────────────────────────────────────────
+
+  final _courseServiceAdmin = CourseService();
+
+  void _showCreateCourseDialog() {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final pinCtrl = TextEditingController();
+    String selectedStrand = 'communication_skills';
+
+    final strands = [
+      'communication_skills',
+      'scientific_literacy',
+      'mathematical_literacy',
+      'life_livelihood_skills',
+      'digital_literacy',
+      'understanding_self_society',
+    ];
+
+    // Find teachers from loaded users
+    final teachers = _recentUsers.where((u) => u['role'] == 'teacher').toList();
+    String? selectedTeacherId =
+        teachers.isNotEmpty ? teachers.first['id'] as String? : null;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Create Course'),
+          content: SizedBox(
+            width: 450,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration:
+                      const InputDecoration(labelText: 'Course Title *'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedStrand,
+                  decoration: const InputDecoration(labelText: 'ALS Strand *'),
+                  items: strands
+                      .map((s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(s.replaceAll('_', ' ')),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      setDialogState(() => selectedStrand = v);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                if (teachers.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    value: selectedTeacherId,
+                    decoration:
+                        const InputDecoration(labelText: 'Assign Teacher'),
+                    items: teachers
+                        .map((t) => DropdownMenuItem(
+                              value: t['id'] as String?,
+                              child: Text(t['full_name']?.toString() ??
+                                  t['email']?.toString() ??
+                                  'Teacher'),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      setDialogState(() => selectedTeacherId = v);
+                    },
+                  ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: pinCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'PIN Code (optional)',
+                    hintText: 'e.g. ABC123',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleCtrl.text.trim().isEmpty) return;
+                try {
+                  await _courseServiceAdmin.createCourse(
+                    title: titleCtrl.text.trim(),
+                    description: descCtrl.text.trim(),
+                    strand: selectedStrand,
+                    teacherId: selectedTeacherId ?? '',
+                    pinCode: pinCtrl.text.trim().isNotEmpty
+                        ? pinCtrl.text.trim()
+                        : null,
+                  );
+                  Navigator.pop(context);
+                  _loadData();
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Course created!'),
+                      backgroundColor: AlsColors.success,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: AlsColors.error,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddModuleDialog(String courseId) {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Module'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(labelText: 'Module Title *'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                decoration: const InputDecoration(labelText: 'Description'),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (titleCtrl.text.trim().isEmpty) return;
+              try {
+                // Get current module count for order_index
+                final existingModules =
+                    await _courseServiceAdmin.getModules(courseId);
+                await _courseServiceAdmin.createModule(
+                  courseId: courseId,
+                  title: titleCtrl.text.trim(),
+                  description: descCtrl.text.trim().isNotEmpty
+                      ? descCtrl.text.trim()
+                      : null,
+                  orderIndex: existingModules.length,
+                );
+                Navigator.pop(context);
+                setState(() {}); // Refresh expansion tiles
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Module added!'),
+                    backgroundColor: AlsColors.success,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: AlsColors.error,
+                  ),
+                );
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddLessonDialog(String moduleId) {
+    final titleCtrl = TextEditingController();
+    final contentCtrl = TextEditingController();
+    String contentType = 'text';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add Lesson'),
+          content: SizedBox(
+            width: 450,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration:
+                      const InputDecoration(labelText: 'Lesson Title *'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: contentType,
+                  decoration: const InputDecoration(labelText: 'Content Type'),
+                  items: const [
+                    DropdownMenuItem(value: 'text', child: Text('Text')),
+                    DropdownMenuItem(value: 'video', child: Text('Video')),
+                    DropdownMenuItem(value: 'pdf', child: Text('PDF')),
+                    DropdownMenuItem(
+                        value: 'interactive', child: Text('Interactive')),
+                    DropdownMenuItem(value: 'mixed', child: Text('Mixed')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setDialogState(() => contentType = v);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: contentCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Content / Text Body',
+                    hintText: 'Lesson content...',
+                  ),
+                  maxLines: 5,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleCtrl.text.trim().isEmpty) return;
+                try {
+                  final existingLessons =
+                      await _courseServiceAdmin.getLessons(moduleId);
+                  await _courseServiceAdmin.createLesson(
+                    moduleId: moduleId,
+                    title: titleCtrl.text.trim(),
+                    contentJson: contentCtrl.text.trim().isNotEmpty
+                        ? contentCtrl.text.trim()
+                        : null,
+                    contentType: contentType,
+                    orderIndex: existingLessons.length,
+                  );
+                  Navigator.pop(context);
+                  setState(() {}); // Refresh
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Lesson added!'),
+                      backgroundColor: AlsColors.success,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: AlsColors.error,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

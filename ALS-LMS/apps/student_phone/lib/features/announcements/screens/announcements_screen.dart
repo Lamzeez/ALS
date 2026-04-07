@@ -7,11 +7,13 @@ import 'package:shared_ui/shared_ui.dart';
 class AnnouncementsScreen extends StatefulWidget {
   final String courseId;
   final String courseTitle;
+  final bool embedded;
 
   const AnnouncementsScreen({
     super.key,
     required this.courseId,
     required this.courseTitle,
+    this.embedded = false,
   });
 
   @override
@@ -43,24 +45,28 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final body = _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : _announcements.isEmpty
+            ? _buildEmptyState()
+            : RefreshIndicator(
+                onRefresh: _loadAnnouncements,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _announcements.length,
+                  itemBuilder: (context, index) {
+                    return _buildAnnouncementCard(_announcements[index]);
+                  },
+                ),
+              );
+
+    if (widget.embedded) return body;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.courseTitle),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _announcements.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadAnnouncements,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _announcements.length,
-                    itemBuilder: (context, index) {
-                      return _buildAnnouncementCard(_announcements[index]);
-                    },
-                  ),
-                ),
+      body: body,
     );
   }
 

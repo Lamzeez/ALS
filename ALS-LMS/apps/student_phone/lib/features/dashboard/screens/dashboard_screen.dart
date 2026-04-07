@@ -5,7 +5,7 @@ import 'package:shared_ui/shared_ui.dart';
 
 import '../../auth/bloc/auth_bloc.dart';
 import '../../enrollment/screens/enroll_course_screen.dart';
-import '../../announcements/screens/announcements_screen.dart';
+import '../../courses/screens/course_detail_screen.dart';
 import '../../maintenance/screens/maintenance_screen.dart';
 import '../screens/settings_screen.dart';
 
@@ -26,6 +26,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Map<String, dynamic>> _enrolledCourses = [];
   List<Map<String, dynamic>> _announcements = [];
+  Map<String, List<Map<String, dynamic>>> _courseProgress = {};
   bool _isLoadingCourses = true;
   bool _isLoadingAnnouncements = true;
   bool _isMaintenanceMode = false;
@@ -57,6 +58,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoadingCourses = true);
     try {
       _enrolledCourses = await _courseService.getEnrolledCourses();
+      // Load progress for each course
+      for (final enrollment in _enrolledCourses) {
+        final course = enrollment['courses'] as Map<String, dynamic>?;
+        if (course != null) {
+          final courseId = course['id'] as String;
+          try {
+            _courseProgress[courseId] =
+                await _courseService.getModuleProgress(courseId);
+          } catch (_) {}
+        }
+      }
     } catch (e) {
       debugPrint('Error loading courses: $e');
     } finally {
@@ -362,12 +374,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => AnnouncementsScreen(
+              builder: (_) => CourseDetailScreen(
                 courseId: course['id'] as String,
                 courseTitle: title,
               ),
             ),
-          );
+          ).then((_) => _loadEnrolledCourses());
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,27 +616,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
 
           // Summary cards
-          Row(
-            children: [
-              Expanded(
-                child: _buildProgressMetric(
-                  'Courses',
-                  '${_enrolledCourses.length}',
-                  Icons.auto_stories,
-                  AlsColors.primary,
+          Builder(builder: (context) {
+            final allProgress =
+                _courseProgress.values.expand((p) => p).toList();
+            final completedModules = allProgress
+                .where((p) =>
+                    p['status'] == 'completed' || p['status'] == 'mastered')
+                .length;
+            final avgMastery = allProgress.isNotEmpty
+                ? allProgress.fold<double>(
+                        0,
+                        (sum, p) =>
+                            sum +
+                            ((p['mastery_score'] as num?)?.toDouble() ?? 0)) /
+                    allProgress.length
+                : 0.0;
+
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildProgressMetric(
+                        'Courses',
+                        '${_enrolledCourses.length}',
+                        Icons.auto_stories,
+                        AlsColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildProgressMetric(
+                        'Completed',
+                        '$completedModules',
+                        Icons.check_circle_outline,
+                        AlsColors.success,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildProgressMetric(
-                  'Active',
-                  '${_enrolledCourses.where((e) => e['status'] == 'active').length}',
-                  Icons.play_circle_outline,
-                  AlsColors.secondary,
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildProgressMetric(
+                        'Avg Mastery',
+                        '${avgMastery.toInt()}%',
+                        Icons.insights,
+                        AlsColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildProgressMetric(
+                        'Active',
+                        '${_enrolledCourses.where((e) => e['status'] == 'active').length}',
+                        Icons.play_circle_outline,
+                        AlsColors.warning,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          }),
           const SizedBox(height: 24),
 
           Text('Course Details',
@@ -672,6 +727,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildProgressCard(Map<String, dynamic> course) {
     final title = course['title'] as String? ?? 'Untitled';
+    final courseId = course['id'] as String;
+    final progress = _courseProgress[courseId] ?? [];
+    final totalModules = progress.length;
+    final completedModules = progress
+        .where((p) => p['status'] == 'completed' || p['status'] == 'mastered')
+        .length;
+    final overallProgress =
+        totalModules > 0 ? completedModules / totalModules : 0.0;
+    final avgMastery = totalModules > 0
+        ? progress.fold<double>(
+                0,
+                (sum, p) =>
+                    sum + ((p['mastery_score'] as num?)?.toDouble() ?? 0)) /
+            totalModules
+        : 0.0;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -680,28 +751,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
+                ),
+                if (totalModules > 0)
+                  Text(
+                    '${avgMastery.toInt()}% mastery',
+                    style: TextStyle(
+                      color: AlsColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
-            // Progress bar placeholder
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
-                value: 0, // Will be populated when module_progress is loaded
+                value: overallProgress,
                 backgroundColor: AlsColors.divider,
-                color: AlsColors.secondary,
+                color: overallProgress >= 1.0
+                    ? AlsColors.success
+                    : AlsColors.secondary,
                 minHeight: 8,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Progress tracking will update as you complete modules.',
+              totalModules > 0
+                  ? '$completedModules of $totalModules modules completed'
+                  : 'No modules available yet',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            // Per-module breakdown
+            if (progress.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...progress.map((p) {
+                final moduleTitle =
+                    (p['modules'] as Map?)?['title'] ?? 'Module';
+                final mastery = (p['mastery_score'] as num?)?.toDouble() ?? 0;
+                final status = p['status'] as String? ?? 'locked';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        status == 'completed' || status == 'mastered'
+                            ? Icons.check_circle
+                            : status == 'in_progress'
+                                ? Icons.play_circle
+                                : Icons.radio_button_unchecked,
+                        size: 16,
+                        color: status == 'completed' || status == 'mastered'
+                            ? AlsColors.success
+                            : status == 'in_progress'
+                                ? AlsColors.warning
+                                : AlsColors.textHint,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          moduleTitle.toString(),
+                          style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '${mastery.toInt()}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AlsColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ],
         ),
       ),
