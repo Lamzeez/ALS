@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_models/shared_models.dart';
 import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
 
 class QuizScreen extends StatefulWidget {
-  final Map<String, dynamic> quiz;
+  final Quiz quiz;
   final String moduleId;
   final String courseId;
   final int moduleLessonsCount;
@@ -24,7 +25,7 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> {
   final _courseService = CourseService();
 
-  List<Map<String, dynamic>> _questions = [];
+  List<QuizQuestion> _questions = [];
   Map<int, String> _answers = {}; // questionIndex → selected answer
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -55,10 +56,10 @@ class _QuizScreenState extends State<QuizScreen> {
   Future<void> _loadQuestions() async {
     try {
       _questions = await _courseService.getQuizQuestions(
-        widget.quiz['id'] as String,
+        widget.quiz.id,
       );
 
-      final timeLimitMins = (widget.quiz['time_limit_mins'] as num?)?.toInt();
+      final timeLimitMins = widget.quiz.timeLimitMins;
       if (timeLimitMins != null && timeLimitMins > 0) {
         _hasTimeLimit = true;
         _remainingSeconds = timeLimitMins * 60;
@@ -103,8 +104,8 @@ class _QuizScreenState extends State<QuizScreen> {
       _score = 0;
       for (int i = 0; i < _questions.length; i++) {
         final q = _questions[i];
-        final questionJson = q['question_json'] as Map<String, dynamic>? ?? {};
-        final points = (q['points'] as num?)?.toDouble() ?? 1.0;
+        final questionJson = q.questionJson;
+        final points = q.points;
         _maxScore += points;
 
         final correctAnswer = questionJson['correct_answer']?.toString() ?? '';
@@ -116,31 +117,29 @@ class _QuizScreenState extends State<QuizScreen> {
       }
 
       _percentage = _maxScore > 0 ? (_score / _maxScore) * 100 : 0;
-      final passingScore =
-          (widget.quiz['passing_score'] as num?)?.toDouble() ?? 75.0;
+      final passingScore = widget.quiz.passingScore;
       _isPassing = _percentage >= passingScore;
 
       // Build answers map
       final answersMap = <String, dynamic>{};
       for (int i = 0; i < _questions.length; i++) {
-        answersMap['q_${_questions[i]['id']}'] = _answers[i] ?? '';
+        answersMap['q_${_questions[i].id}'] = _answers[i] ?? '';
       }
 
       // Get attempt number
       final previousScores = await _courseService.getScoresForQuiz(
-        widget.quiz['id'] as String,
+        widget.quiz.id,
       );
       final attemptNum = previousScores.length + 1;
 
       // Calculate time taken
-      final timeLimitMins =
-          (widget.quiz['time_limit_mins'] as num?)?.toInt() ?? 0;
+      final timeLimitMins = widget.quiz.timeLimitMins ?? 0;
       final totalTimeSecs =
           timeLimitMins > 0 ? (timeLimitMins * 60) - _remainingSeconds : 0;
 
       // Submit score
       await _courseService.submitQuizScore(
-        quizId: widget.quiz['id'] as String,
+        quizId: widget.quiz.id,
         score: _score,
         maxScore: _maxScore,
         attemptNum: attemptNum,
@@ -180,7 +179,7 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.quiz['title'] as String? ?? 'Quiz')),
+        appBar: AppBar(title: Text(widget.quiz.title)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -189,7 +188,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (_questions.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.quiz['title'] as String? ?? 'Quiz')),
+        appBar: AppBar(title: Text(widget.quiz.title)),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -209,8 +208,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildQuizUI() {
     final question = _questions[_currentQuestionIndex];
-    final questionJson =
-        question['question_json'] as Map<String, dynamic>? ?? {};
+    final questionJson = question.questionJson;
     final questionText = questionJson['text'] as String? ?? '';
     final options = (questionJson['options'] as List<dynamic>?)
             ?.map((o) => o.toString())
@@ -220,7 +218,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.quiz['title'] as String? ?? 'Quiz'),
+        title: Text(widget.quiz.title),
         actions: [
           if (_hasTimeLimit)
             Padding(
@@ -456,8 +454,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildResultScreen() {
-    final passingScore =
-        (widget.quiz['passing_score'] as num?)?.toDouble() ?? 75.0;
+    final passingScore = widget.quiz.passingScore;
 
     return Scaffold(
       appBar: AppBar(

@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
+import 'course.dart';
 
 part 'announcement.g.dart';
 
@@ -26,6 +27,8 @@ class Announcement extends Equatable {
   final String? teacherName;
   @JsonKey(name: 'comment_count', includeIfNull: false)
   final int? commentCount;
+  @JsonKey(includeFromJson: true, includeToJson: false)
+  final Course? course;
 
   const Announcement({
     required this.id,
@@ -39,10 +42,25 @@ class Announcement extends Equatable {
     this.updatedAt,
     this.teacherName,
     this.commentCount,
+    this.course,
   });
 
-  factory Announcement.fromJson(Map<String, dynamic> json) =>
-      _$AnnouncementFromJson(json);
+  factory Announcement.fromJson(Map<String, dynamic> json) {
+    return Announcement(
+      id: json['id'] as String,
+      courseId: json['course_id'] as String,
+      teacherId: json['teacher_id'] as String,
+      title: json['title'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      allowComments: json['allow_comments'] as bool? ?? true,
+      isPinned: json['is_pinned'] as bool? ?? false,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
+      teacherName: json['teacher_name'] as String?,
+      commentCount: json['comment_count'] as int?,
+      course: json['courses'] != null ? Course.fromJson(json['courses'] as Map<String, dynamic>) : null,
+    );
+  }
   Map<String, dynamic> toJson() => _$AnnouncementToJson(this);
 
   static const String createTableSQL = '''

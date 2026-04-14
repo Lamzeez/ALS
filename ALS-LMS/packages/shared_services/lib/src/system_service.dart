@@ -1,7 +1,12 @@
+import 'dart:developer' as developer;
 import 'package:shared_models/shared_models.dart';
 import 'supabase_client.dart';
 
 class SystemService {
+  /// Checks if the system kill switch is activated.
+  ///
+  /// ⚠️ CRITICAL: In case of error, defaults to LOCKED (fail-safe)
+  /// This prevents the app from bypassing security checks during network/DB issues.
   Future<bool> isSystemLocked() async {
     try {
       final data = await SupabaseConfig.client
@@ -9,10 +14,30 @@ class SystemService {
           .select('value')
           .eq('key', 'kill_switch')
           .maybeSingle();
-      if (data == null) return false;
-      return (data['value'] as Map<String, dynamic>)['active'] == true;
-    } catch (_) {
-      return false;
+
+      if (data == null) {
+        developer.log('Kill switch setting not found in database',
+            name: 'SystemService', level: 900);
+        return false; // Default: system not locked if setting doesn't exist
+      }
+
+      final value = data['value'];
+      if (value is! Map<String, dynamic>) {
+        developer.log('Invalid kill switch value format: $value',
+            name: 'SystemService', level: 900);
+        return true; // Fail-safe: lock system if invalid format
+      }
+
+      return value['active'] == true;
+    } catch (e, stackTrace) {
+      // 🔥 CRITICAL: Fail-safe - lock system on any error to prevent security bypass
+      developer.log(
+          'Kill switch check failed - defaulting to LOCKED for security',
+          error: e,
+          stackTrace: stackTrace,
+          name: 'SystemService',
+          level: 1000);
+      return true; // Fail-safe: assume system is locked
     }
   }
 
@@ -23,11 +48,25 @@ class SystemService {
           .select('value')
           .eq('key', 'maintenance_mode')
           .maybeSingle();
-      if (data == null) return '';
-      return (data['value'] as Map<String, dynamic>)['message'] as String? ??
-          '';
-    } catch (_) {
-      return '';
+
+      if (data == null) {
+        developer.log('Maintenance mode setting not found',
+            name: 'SystemService');
+        return '';
+      }
+
+      final value = data['value'];
+      if (value is! Map<String, dynamic>) {
+        developer.log('Invalid maintenance mode format: $value',
+            name: 'SystemService', level: 900);
+        return 'System maintenance in progress. Please try again later.';
+      }
+
+      return value['message'] as String? ?? '';
+    } catch (e, stackTrace) {
+      developer.log('Failed to get system message',
+          error: e, stackTrace: stackTrace, name: 'SystemService', level: 900);
+      return 'Unable to load system status. Please check your connection.';
     }
   }
 
@@ -37,8 +76,10 @@ class SystemService {
       return (rows as List)
           .map((r) => SystemSetting.fromJson(r as Map<String, dynamic>))
           .toList();
-    } catch (_) {
-      return [];
+    } catch (e, stackTrace) {
+      developer.log('Failed to load system settings',
+          error: e, stackTrace: stackTrace, name: 'SystemService', level: 900);
+      throw Exception('Unable to load system settings: ${e.toString()}');
     }
   }
 
@@ -52,8 +93,10 @@ class SystemService {
       return (rows as List)
           .map((r) => ActivityLog.fromJson(r as Map<String, dynamic>))
           .toList();
-    } catch (_) {
-      return [];
+    } catch (e, stackTrace) {
+      developer.log('Failed to load activity logs',
+          error: e, stackTrace: stackTrace, name: 'SystemService', level: 900);
+      throw Exception('Unable to load activity logs: ${e.toString()}');
     }
   }
 
@@ -131,8 +174,15 @@ class SystemService {
     try {
       final result = await SupabaseConfig.client.rpc('get_global_analytics');
       return (result as Map<String, dynamic>?) ?? {};
-    } catch (_) {
-      return {};
+    } catch (e, stackTrace) {
+      developer.log(
+        'get_global_analytics RPC failed — function may not exist in database',
+        error: e,
+        stackTrace: stackTrace,
+        name: 'SystemService',
+        level: 900,
+      );
+      return {'_error': true};
     }
   }
 }

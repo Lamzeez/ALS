@@ -1,104 +1,267 @@
+import 'dart:developer' as developer;
+import 'package:shared_models/shared_models.dart';
 import 'supabase_client.dart';
 
 class CourseService {
-  Future<List<Map<String, dynamic>>> getEnrolledCourses() async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) return [];
-    return await SupabaseConfig.client
-        .from('course_enrollments')
-        .select('*, courses(*)')
-        .eq('student_id', uid)
-        .eq('status', 'active');
+  /// 🎯 Get courses enrolled by current student with proper type safety
+  Future<List<CourseEnrollment>> getEnrolledCourses() async {
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'User not authenticated',
+            operationName: 'getEnrolledCourses',
+            isAuthError: true,
+          );
+        }
+
+        final rows = await SupabaseConfig.client
+            .from('course_enrollments')
+            .select('*, courses(*)')
+            .eq('student_id', uid)
+            .eq('status', 'active');
+
+        return (rows as List)
+            .map((r) => CourseEnrollment.fromJson(r as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getEnrolledCourses',
+    );
   }
 
+  /// 📌 Enroll student by PIN with proper validation and error handling
   Future<void> enrollByPin(String pin) async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) throw Exception('Not authenticated');
-    final courses = await SupabaseConfig.client
-        .from('courses')
-        .select('id')
-        .eq('pin_code', pin)
-        .eq('is_published', true);
-    if (courses.isEmpty) throw Exception('Invalid PIN. No course found.');
-    final courseId = courses.first['id'] as String;
-    await SupabaseConfig.client.from('course_enrollments').insert({
-      'student_id': uid,
-      'course_id': courseId,
-      'enrolled_via': 'pin',
-      'status': 'active',
-    });
+    await SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'User not authenticated',
+            operationName: 'enrollByPin',
+            isAuthError: true,
+          );
+        }
+
+        if (pin.trim().isEmpty) {
+          throw SupabaseApiException('PIN cannot be empty');
+        }
+
+        // Check if course exists and is published
+        final courses = await SupabaseConfig.client
+            .from('courses')
+            .select('id, title')
+            .eq('pin_code', pin.trim())
+            .eq('is_published', true);
+
+        if (courses.isEmpty) {
+          throw SupabaseApiException(
+              'Invalid PIN. No published course found with this PIN.');
+        }
+
+        final course = courses.first;
+        final courseId = course['id'] as String;
+
+        // Check if already enrolled
+        final existingEnrollment = await SupabaseConfig.client
+            .from('course_enrollments')
+            .select('id')
+            .eq('student_id', uid)
+            .eq('course_id', courseId)
+            .maybeSingle();
+
+        if (existingEnrollment != null) {
+          throw SupabaseApiException(
+              'You are already enrolled in "${course['title']}"');
+        }
+
+        // Create enrollment
+        await SupabaseConfig.client.from('course_enrollments').insert({
+          'student_id': uid,
+          'course_id': courseId,
+          'enrolled_via': 'pin',
+          'status': 'active',
+          'enrolled_at': DateTime.now().toIso8601String(),
+        });
+
+        developer.log(
+            'Student enrolled successfully in course: ${course['title']}',
+            name: 'CourseService');
+      },
+      operationName: 'enrollByPin',
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getTeacherCourses() async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) return [];
-    return await SupabaseConfig.client
-        .from('courses')
-        .select('*')
-        .eq('teacher_id', uid)
-        .eq('is_published', true);
+  /// 📚 Get courses created by current teacher
+  Future<List<Course>> getTeacherCourses() async {
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'Teacher not authenticated',
+            operationName: 'getTeacherCourses',
+            isAuthError: true,
+          );
+        }
+
+        final rows = await SupabaseConfig.client
+            .from('courses')
+            .select('*')
+            .eq('teacher_id', uid)
+            .eq('is_published', true)
+            .order('created_at', ascending: false);
+
+        return (rows as List)
+            .map((r) => Course.fromJson(r as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getTeacherCourses',
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getCourseStudents(String courseId) async {
-    return await SupabaseConfig.client
-        .from('course_enrollments')
-        .select('*, profiles(*)')
-        .eq('course_id', courseId)
-        .eq('status', 'active');
+  /// 👥 Get students enrolled in a specific course with their profiles
+  Future<List<Profile>> getCourseStudents(String courseId) async {
+    return SupabaseConfig.withRetry(
+      () async {
+        if (courseId.trim().isEmpty) {
+          throw SupabaseApiException('Course ID cannot be empty');
+        }
+
+        final rows = await SupabaseConfig.client
+            .from('course_enrollments')
+            .select('*, profiles(*)')
+            .eq('course_id', courseId)
+            .eq('status', 'active')
+            .order('enrolled_at', ascending: false);
+
+        return (rows as List)
+            .where((r) => r['profiles'] != null)
+            .map((r) => Profile.fromJson(r['profiles'] as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getCourseStudents',
+    );
   }
 
   // ── Learning Flow Methods ──
 
-  Future<List<Map<String, dynamic>>> getModules(String courseId) async {
-    return await SupabaseConfig.client
-        .from('modules')
-        .select()
-        .eq('course_id', courseId)
-        .order('order_index');
+  /// 📋 Get modules for a course with proper validation
+  Future<List<Module>> getModules(String courseId) async {
+    return SupabaseConfig.withRetry(
+      () async {
+        if (courseId.trim().isEmpty) {
+          throw SupabaseApiException('Course ID cannot be empty');
+        }
+
+        final rows = await SupabaseConfig.client
+            .from('modules')
+            .select('*')
+            .eq('course_id', courseId)
+            .order('order_index');
+
+        return (rows as List)
+            .map((r) => Module.fromJson(r as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getModules',
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getLessons(String moduleId) async {
-    return await SupabaseConfig.client
-        .from('lessons')
-        .select()
-        .eq('module_id', moduleId)
-        .order('order_index');
+  /// 📝 Get lessons for a module
+  Future<List<Lesson>> getLessons(String moduleId) async {
+    return SupabaseConfig.withRetry(
+      () async {
+        if (moduleId.trim().isEmpty) {
+          throw SupabaseApiException('Module ID cannot be empty');
+        }
+
+        final rows = await SupabaseConfig.client
+            .from('lessons')
+            .select('*')
+            .eq('module_id', moduleId)
+            .order('order_index');
+
+        return (rows as List)
+            .map((r) => Lesson.fromJson(r as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getLessons',
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getLessonMedia(String lessonId) async {
-    return await SupabaseConfig.client
-        .from('lesson_media')
-        .select()
-        .eq('lesson_id', lessonId)
-        .order('order_index');
+  /// 🎥 Get media files for a lesson
+  Future<List<LessonMedia>> getLessonMedia(String lessonId) async {
+    return SupabaseConfig.withRetry(
+      () async {
+        if (lessonId.trim().isEmpty) {
+          throw SupabaseApiException('Lesson ID cannot be empty');
+        }
+
+        final rows = await SupabaseConfig.client
+            .from('lesson_media')
+            .select('*')
+            .eq('lesson_id', lessonId)
+            .order('order_index');
+
+        return (rows as List)
+            .map((r) => LessonMedia.fromJson(r as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getLessonMedia',
+    );
   }
 
-  Future<Map<String, dynamic>?> getQuizForLesson(String lessonId) async {
-    final result = await SupabaseConfig.client
-        .from('quizzes')
-        .select()
-        .eq('lesson_id', lessonId)
-        .eq('is_published', true)
-        .limit(1);
-    return result.isNotEmpty ? result.first : null;
+  /// ❓ Get quiz for a lesson
+  Future<Quiz?> getQuizForLesson(String lessonId) async {
+    return SupabaseConfig.withRetry(
+      () async {
+        if (lessonId.trim().isEmpty) {
+          throw SupabaseApiException('Lesson ID cannot be empty');
+        }
+
+        final result = await SupabaseConfig.client
+            .from('quizzes')
+            .select('*')
+            .eq('lesson_id', lessonId)
+            .eq('is_published', true)
+            .maybeSingle();
+
+        return result != null ? Quiz.fromJson(result) : null;
+      },
+      operationName: 'getQuizForLesson',
+    );
   }
 
-  Future<Map<String, dynamic>?> getQuizForModule(String moduleId) async {
-    final result = await SupabaseConfig.client
-        .from('quizzes')
-        .select()
-        .eq('module_id', moduleId)
-        .eq('is_published', true)
-        .limit(1);
-    return result.isNotEmpty ? result.first : null;
+  Future<Quiz?> getQuizForModule(String moduleId) async {
+    return SupabaseConfig.withRetry(
+      () async {
+        if (moduleId.trim().isEmpty) {
+          throw SupabaseApiException('Module ID cannot be empty');
+        }
+        final result = await SupabaseConfig.client
+            .from('quizzes')
+            .select()
+            .eq('module_id', moduleId)
+            .eq('is_published', true)
+            .maybeSingle();
+
+        return result != null ? Quiz.fromJson(result) : null;
+      },
+      operationName: 'getQuizForModule',
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getQuizQuestions(String quizId) async {
-    return await SupabaseConfig.client
+  Future<List<QuizQuestion>> getQuizQuestions(String quizId) async {
+    final rows = await SupabaseConfig.client
         .from('quiz_questions')
         .select()
         .eq('quiz_id', quizId)
         .order('order_index');
+
+    return (rows as List)
+        .map((r) => QuizQuestion.fromJson(r as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> submitQuizScore({
@@ -109,27 +272,42 @@ class CourseService {
     required Map<String, dynamic> answers,
     required int timeTakenSecs,
   }) async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) throw Exception('Not authenticated');
-    await SupabaseConfig.client.from('scores').insert({
-      'student_id': uid,
-      'quiz_id': quizId,
-      'score': score,
-      'max_score': maxScore,
-      'attempt_num': attemptNum,
-      'answers_json': answers,
-      'time_taken_secs': timeTakenSecs,
-    });
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'Not authenticated',
+            operationName: 'submitQuizScore',
+            isAuthError: true,
+          );
+        }
+        await SupabaseConfig.client.from('scores').insert({
+          'student_id': uid,
+          'quiz_id': quizId,
+          'score': score,
+          'max_score': maxScore,
+          'attempt_num': attemptNum,
+          'answers_json': answers,
+          'time_taken_secs': timeTakenSecs,
+        });
+      },
+      operationName: 'submitQuizScore',
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getModuleProgress(String courseId) async {
+  Future<List<ModuleProgress>> getModuleProgress(String courseId) async {
     final uid = SupabaseConfig.client.auth.currentUser?.id;
     if (uid == null) return [];
-    return await SupabaseConfig.client
+    final rows = await SupabaseConfig.client
         .from('module_progress')
         .select('*, modules(title, order_index)')
         .eq('student_id', uid)
         .eq('course_id', courseId);
+
+    return (rows as List)
+        .map((r) => ModuleProgress.fromJson(r as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> upsertModuleProgress({
@@ -140,37 +318,57 @@ class CourseService {
     int? lessonsViewed,
     int? totalLessons,
   }) async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) throw Exception('Not authenticated');
-    final data = <String, dynamic>{
-      'student_id': uid,
-      'module_id': moduleId,
-      'course_id': courseId,
-      'status': status,
-    };
-    if (masteryScore != null) data['mastery_score'] = masteryScore;
-    if (lessonsViewed != null) data['lessons_viewed'] = lessonsViewed;
-    if (totalLessons != null) data['total_lessons'] = totalLessons;
-    if (status == 'in_progress' || status == 'available') {
-      data['started_at'] = DateTime.now().toIso8601String();
-    }
-    if (status == 'completed' || status == 'mastered') {
-      data['completed_at'] = DateTime.now().toIso8601String();
-    }
-    await SupabaseConfig.client
-        .from('module_progress')
-        .upsert(data, onConflict: 'student_id,module_id');
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'Not authenticated',
+            operationName: 'upsertModuleProgress',
+            isAuthError: true,
+          );
+        }
+        final data = <String, dynamic>{
+          'student_id': uid,
+          'module_id': moduleId,
+          'course_id': courseId,
+          'status': status,
+        };
+        if (masteryScore != null) data['mastery_score'] = masteryScore;
+        if (lessonsViewed != null) data['lessons_viewed'] = lessonsViewed;
+        if (totalLessons != null) data['total_lessons'] = totalLessons;
+        if (status == 'in_progress' || status == 'available') {
+          data['started_at'] = DateTime.now().toIso8601String();
+        }
+        if (status == 'completed' || status == 'mastered') {
+          data['completed_at'] = DateTime.now().toIso8601String();
+        }
+        await SupabaseConfig.client
+            .from('module_progress')
+            .upsert(data, onConflict: 'student_id,module_id');
+      },
+      operationName: 'upsertModuleProgress',
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getScoresForQuiz(String quizId) async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) return [];
-    return await SupabaseConfig.client
-        .from('scores')
-        .select()
-        .eq('student_id', uid)
-        .eq('quiz_id', quizId)
-        .order('attempt_num');
+  Future<List<Score>> getScoresForQuiz(String quizId) async {
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) return [];
+        final rows = await SupabaseConfig.client
+            .from('scores')
+            .select()
+            .eq('student_id', uid)
+            .eq('quiz_id', quizId)
+            .order('attempt_num');
+
+        return (rows as List)
+            .map((r) => Score.fromJson(r as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getScoresForQuiz',
+    );
   }
 
   // ── Admin/Teacher Course Management ──

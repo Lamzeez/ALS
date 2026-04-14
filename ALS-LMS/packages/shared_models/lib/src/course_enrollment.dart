@@ -1,6 +1,7 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
 import 'enums.dart';
+import 'course.dart';
 
 part 'course_enrollment.g.dart';
 
@@ -23,6 +24,8 @@ class CourseEnrollment extends Equatable {
   final String? courseTitle;
   @JsonKey(name: 'course_description', includeIfNull: false)
   final String? courseDescription;
+  @JsonKey(includeFromJson: true, includeToJson: false)
+  final Course? course;
 
   const CourseEnrollment({
     required this.id,
@@ -33,10 +36,22 @@ class CourseEnrollment extends Equatable {
     this.enrolledAt,
     this.courseTitle,
     this.courseDescription,
+    this.course,
   });
 
-  factory CourseEnrollment.fromJson(Map<String, dynamic> json) =>
-      _$CourseEnrollmentFromJson(json);
+  factory CourseEnrollment.fromJson(Map<String, dynamic> json) {
+    return CourseEnrollment(
+      id: json['id'] as String,
+      studentId: json['student_id'] as String,
+      courseId: json['course_id'] as String,
+      enrolledVia: EnrollmentMethod.fromJson(json['enrolled_via'] as String? ?? 'pin'),
+      status: EnrollmentStatus.fromJson(json['status'] as String? ?? 'active'),
+      enrolledAt: json['enrolled_at'] != null ? DateTime.parse(json['enrolled_at'] as String) : null,
+      courseTitle: json['course_title'] as String?,
+      courseDescription: json['course_description'] as String?,
+      course: json['courses'] != null ? Course.fromJson(json['courses'] as Map<String, dynamic>) : null,
+    );
+  }
   Map<String, dynamic> toJson() => _$CourseEnrollmentToJson(this);
 
   static String _methodToJson(EnrollmentMethod m) => m.toJson();

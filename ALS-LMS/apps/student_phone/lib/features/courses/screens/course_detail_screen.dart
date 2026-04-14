@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_models/shared_models.dart';
 import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
 
@@ -24,9 +25,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   late TabController _tabController;
   final _courseService = CourseService();
 
-  List<Map<String, dynamic>> _modules = [];
-  Map<String, List<Map<String, dynamic>>> _lessonsByModule = {};
-  List<Map<String, dynamic>> _moduleProgress = [];
+  List<Module> _modules = [];
+  Map<String, List<Lesson>> _lessonsByModule = {};
+  List<ModuleProgress> _moduleProgress = [];
   bool _isLoading = true;
 
   @override
@@ -50,7 +51,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
 
       // Load lessons for each module
       for (final module in _modules) {
-        final moduleId = module['id'] as String;
+        final moduleId = module.id;
         _lessonsByModule[moduleId] = await _courseService.getLessons(moduleId);
       }
     } catch (e) {
@@ -61,21 +62,21 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   }
 
   double _getModuleMastery(String moduleId) {
-    final progress = _moduleProgress.where((p) => p['module_id'] == moduleId);
+    final progress = _moduleProgress.where((p) => p.moduleId == moduleId);
     if (progress.isEmpty) return 0;
-    return (progress.first['mastery_score'] as num?)?.toDouble() ?? 0;
+    return progress.first.masteryScore ?? 0;
   }
 
   String _getModuleStatus(String moduleId) {
-    final progress = _moduleProgress.where((p) => p['module_id'] == moduleId);
+    final progress = _moduleProgress.where((p) => p.moduleId == moduleId);
     if (progress.isEmpty) return 'not_started';
-    return progress.first['status'] as String? ?? 'locked';
+    return progress.first.status.name;
   }
 
   int _getLessonsViewed(String moduleId) {
-    final progress = _moduleProgress.where((p) => p['module_id'] == moduleId);
+    final progress = _moduleProgress.where((p) => p.moduleId == moduleId);
     if (progress.isEmpty) return 0;
-    return (progress.first['lessons_viewed'] as num?)?.toInt() ?? 0;
+    return progress.first.lessonsViewed ?? 0;
   }
 
   @override
@@ -133,7 +134,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     // Overall progress
     final totalModules = _modules.length;
     final completedModules = _moduleProgress
-        .where((p) => p['status'] == 'completed' || p['status'] == 'mastered')
+        .where((p) => p.status == 'completed' || p.status == 'mastered')
         .length;
     final overallProgress =
         totalModules > 0 ? completedModules / totalModules : 0.0;
@@ -195,7 +196,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           // Module list
           ...List.generate(_modules.length, (index) {
             final module = _modules[index];
-            final moduleId = module['id'] as String;
+            final moduleId = module.id;
             final lessons = _lessonsByModule[moduleId] ?? [];
             final mastery = _getModuleMastery(moduleId);
             final status = _getModuleStatus(moduleId);
@@ -216,16 +217,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   }
 
   Widget _buildModuleTile({
-    required Map<String, dynamic> module,
-    required List<Map<String, dynamic>> lessons,
+    required Module module,
+    required List<Lesson> lessons,
     required double mastery,
     required String status,
     required int lessonsViewed,
     required int index,
   }) {
-    final title = module['title'] as String? ?? 'Untitled Module';
-    final description = module['description'] as String? ?? '';
-    final moduleId = module['id'] as String;
+    final title = module.title;
+    final description = module.description ?? '';
+    final moduleId = module.id;
 
     Color statusColor;
     IconData statusIcon;
@@ -287,9 +288,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             )
           else
             ...lessons.map((lesson) {
-              final lessonTitle =
-                  lesson['title'] as String? ?? 'Untitled Lesson';
-              final contentType = lesson['content_type'] as String? ?? 'text';
+              final lessonTitle = lesson.title;
+              final contentType = lesson.contentType.name;
               IconData typeIcon;
               switch (contentType) {
                 case 'video':

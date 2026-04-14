@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart' as supa;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_models/shared_models.dart';
 import 'supabase_client.dart';
 
@@ -7,29 +9,117 @@ class AuthService {
   supa.SupabaseClient get _client => SupabaseConfig.client;
 
   supa.Session? get currentSession => _client.auth.currentSession;
+  supa.User? get currentUser => _client.auth.currentUser;
 
   bool get isLoggedIn => currentSession != null;
 
   Stream<supa.AuthState> get onAuthStateChange =>
       _client.auth.onAuthStateChange;
 
+  /// 🔍 Get current user profile with retry and proper error handling
   Future<Profile?> getCurrentProfile() async {
-    final uid = _client.auth.currentUser?.id;
-    if (uid == null) return null;
-    final data = await _client.from('profiles').select().eq('id', uid).single();
-    return Profile.fromJson(data);
-  }
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = _client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'User session not found',
+            operationName: 'getCurrentProfile',
+            isAuthError: true,
+          );
+        }
 
-  Future<void> signInWithEmail(
-      {required String email, required String password}) async {
-    await _client.auth.signInWithPassword(email: email, password: password);
-  }
+        final data =
+            await _client.from('profiles').select('*').eq('id', uid).maybeSingle();
 
-  Future<void> signInWithGoogle() async {
-    await _client.auth.signInWithOAuth(
-      supa.OAuthProvider.google,
-      redirectTo: 'com.als.mobile_app://login-callback',
+        if (data == null) return null;
+
+        return Profile.fromJson(data);
+      },
+      operationName: 'getCurrentProfile',
     );
+  }
+
+  /// 🔑 Sign in with email and password with enhanced validation
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    await SupabaseConfig.withRetry(
+      () async {
+        if (email.trim().isEmpty || password.trim().isEmpty) {
+          throw SupabaseApiException('Email and password are required');
+        }
+
+        final response = await _client.auth.signInWithPassword(
+          email: email.trim(),
+          password: password,
+        );
+
+        // Check for email verification if required
+        final user = response.user;
+        if (user != null && user.emailConfirmedAt == null) {
+          // User exists but email not verified
+          throw SupabaseApiException(
+            'EMAIL_NOT_VERIFIED: Please verify your email before signing in.',
+            isAuthError: true,
+          );
+        }
+
+        developer.log('User signed in successfully: ${user?.email}',
+            name: 'AuthService');
+      },
+      operationName: 'signInWithEmail',
+    );
+  }
+
+  /// 🌎 Native Google Sign-In for mobile (ID Token flow) with deep diagnostics
+  Future<void> signInWithGoogle() async {
+    try {
+      print('[ALS-AUTH] Initiating Native Google Sign-In...');
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: '449723385926-auv1027j4frutqtujit7vi1sqhl4b5ui.apps.googleusercontent.com',
+      );
+      
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      
+      if (googleUser == null) {
+        print('[ALS-AUTH] Google Sign-In cancelled by user');
+        throw SupabaseApiException('Google sign-in was cancelled by user');
+      }
+
+      print('[ALS-AUTH] Google user found: ${googleUser.email}. Fetching tokens...');
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+      final String? accessToken = googleAuth.accessToken;
+
+      if (idToken == null) {
+        print('[ALS-AUTH] CRITICAL: ID Token is null from Google');
+        throw SupabaseApiException('No ID Token found from Google authentication');
+      }
+
+      print('[ALS-AUTH] Tokens received. Sending to Supabase...');
+      await _client.auth.signInWithIdToken(
+        provider: supa.OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      print('[ALS-AUTH] Supabase session established for: ${googleUser.email}');
+    } on supa.AuthException catch (e) {
+      print('[ALS-AUTH] Supabase Auth Error: ${e.message}');
+      throw SupabaseApiException.fromError(e, operationName: 'signInWithGoogle');
+    } catch (e) {
+      print('[ALS-AUTH] Unexpected Google Sign-In Error: $e');
+      if (e.toString().contains('7')) {
+         throw SupabaseApiException('Google Sign-In Error (7): Network error or invalid package name/SHA-1.');
+      } else if (e.toString().contains('10')) {
+         throw SupabaseApiException('Google Sign-In Error (10): Developer error. Check client IDs and SHA-1 in Cloud Console.');
+      } else if (e.toString().contains('12500')) {
+         throw SupabaseApiException('Google Sign-In Error (12500): Sign-in failed. Check Play Services.');
+      }
+      throw SupabaseApiException.fromError(e, operationName: 'signInWithGoogle');
+    }
   }
 
   Future<void> signUpWithEmail({
@@ -58,12 +148,19 @@ class AuthService {
       // Teachers start as pending; everyone else is approved.
       final approvalStatus =
           roleStr == UserRole.teacher.toJson() ? 'pending' : 'approved';
-      await _client.from('profiles').update({
+      // Use upsert so the profile row is created if the DB trigger hasn't run yet.
+      await _client.from('profiles').upsert({
+        'id': uid,
+        'full_name': fullName,
+        'email': email,
         'role': roleStr,
         'approval_status': approvalStatus,
         'onboarding_completed': true,
         if (studentId != null && studentId.isNotEmpty) 'lrn': studentId,
-      }).eq('id', uid);
+        if (empId != null && empId.isNotEmpty) 'employee_id': empId,
+        if (centerLocation != null && centerLocation.isNotEmpty)
+          'district_id': centerLocation,
+      }, onConflict: 'id');
     }
   }
 
@@ -73,16 +170,27 @@ class AuthService {
     required UserRole role,
     String? lrn,
     String? empId,
+    String? districtId,
   }) async {
-    final uid = _client.auth.currentUser?.id;
-    if (uid == null) return;
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    final uid = user.id;
+    final metadata = user.userMetadata ?? {};
     final approvalStatus = role == UserRole.teacher ? 'pending' : 'approved';
-    await _client.from('profiles').update({
+
+    await _client.from('profiles').upsert({
+      'id': uid,
+      'full_name': metadata['full_name'] ?? metadata['name'] ?? 'User',
+      'email': user.email,
       'role': role.toJson(),
       'approval_status': approvalStatus,
       'onboarding_completed': true,
       if (lrn != null && lrn.isNotEmpty) 'lrn': lrn,
-    }).eq('id', uid);
+      if (empId != null && empId.isNotEmpty) 'employee_id': empId,
+      if (districtId != null && districtId.isNotEmpty)
+        'district_id': districtId,
+    }, onConflict: 'id');
   }
 
   /// Upload a new avatar to Supabase Storage and update the profile record.
@@ -105,20 +213,71 @@ class AuthService {
     return url;
   }
 
+  /// 📝 Sign out user with proper cleanup and error handling
   Future<void> signOut() async {
-    await _client.auth.signOut();
+    await SupabaseConfig.withRetry(
+      () async {
+        final userId = _client.auth.currentUser?.id;
+
+        await _client.auth.signOut();
+
+        developer.log('User signed out successfully: $userId',
+            name: 'AuthService');
+      },
+      operationName: 'signOut',
+      maxRetries: 1, // Don't retry signOut multiple times
+    );
   }
 
+  /// 📝 Update user profile with validation
   Future<void> updateProfile({required String fullName, String? lrn}) async {
-    final uid = _client.auth.currentUser?.id;
-    if (uid == null) return;
-    await _client.from('profiles').update({
-      'full_name': fullName,
-      if (lrn != null && lrn.isNotEmpty) 'lrn': lrn,
-    }).eq('id', uid);
+    await SupabaseConfig.withRetry(
+      () async {
+        final uid = _client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'User not authenticated',
+            operationName: 'updateProfile',
+            isAuthError: true,
+          );
+        }
+
+        if (fullName.trim().isEmpty) {
+          throw SupabaseApiException('Full name cannot be empty');
+        }
+
+        final updateData = {
+          'full_name': fullName.trim(),
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+
+        if (lrn != null && lrn.trim().isNotEmpty) {
+          updateData['lrn'] = lrn.trim();
+        }
+
+        await _client.from('profiles').update(updateData).eq('id', uid);
+
+        developer.log('Profile updated successfully', name: 'AuthService');
+      },
+      operationName: 'updateProfile',
+    );
   }
 
+  /// 🔐 Update user password with proper validation
   Future<void> updatePassword(String newPassword) async {
-    await _client.auth.updateUser(supa.UserAttributes(password: newPassword));
+    await SupabaseConfig.withRetry(
+      () async {
+        if (newPassword.length < 6) {
+          throw SupabaseApiException(
+              'Password must be at least 6 characters long');
+        }
+
+        await _client.auth
+            .updateUser(supa.UserAttributes(password: newPassword));
+
+        developer.log('Password updated successfully', name: 'AuthService');
+      },
+      operationName: 'updatePassword',
+    );
   }
 }

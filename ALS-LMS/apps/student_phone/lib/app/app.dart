@@ -30,6 +30,9 @@ class AlsStudentApp extends StatelessWidget {
         RepositoryProvider<AuthService>(
           create: (_) => AuthService(),
         ),
+        RepositoryProvider<BiometricService>(
+          create: (_) => BiometricService(),
+        ),
         RepositoryProvider<ConnectivityService>.value(
           value: connectivityService,
         ),
@@ -46,6 +49,7 @@ class AlsStudentApp extends StatelessWidget {
       child: BlocProvider(
         create: (context) => AuthBloc(
           authService: context.read<AuthService>(),
+          biometricService: context.read<BiometricService>(),
         )..add(AuthCheckRequested()),
         child: MaterialApp(
           title: 'ALS Student',

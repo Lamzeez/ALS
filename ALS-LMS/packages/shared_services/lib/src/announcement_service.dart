@@ -2,54 +2,82 @@ import 'package:shared_models/shared_models.dart';
 import 'supabase_client.dart';
 
 class AnnouncementService {
-  /// Returns raw maps with nested `courses(title)` for the dashboard.
-  Future<List<Map<String, dynamic>>> getStudentAnnouncements() async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) return [];
-    final enrollments = await SupabaseConfig.client
-        .from('course_enrollments')
-        .select('course_id')
-        .eq('student_id', uid)
-        .eq('status', 'active');
-    if (enrollments.isEmpty) return [];
-    final courseIds = enrollments.map((e) => e['course_id'] as String).toList();
-    return await SupabaseConfig.client
-        .from('announcements')
-        .select('*, courses(title)')
-        .inFilter('course_id', courseIds)
-        .order('created_at', ascending: false);
+  /// Returns Announcement models with nested course data for the student dashboard.
+  Future<List<Announcement>> getStudentAnnouncements() async {
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) return [];
+        final enrollments = await SupabaseConfig.client
+            .from('course_enrollments')
+            .select('course_id')
+            .eq('student_id', uid)
+            .eq('status', 'active');
+        if (enrollments.isEmpty) return [];
+        final courseIds =
+            enrollments.map((e) => e['course_id'] as String).toList();
+        final data = await SupabaseConfig.client
+            .from('announcements')
+            .select('*, courses(*)')
+            .inFilter('course_id', courseIds)
+            .order('created_at', ascending: false);
+        return (data as List).map((e) => Announcement.fromJson(e)).toList();
+      },
+      operationName: 'getStudentAnnouncements',
+    );
   }
 
   Future<List<Announcement>> getCourseAnnouncements(String courseId) async {
-    final data = await SupabaseConfig.client
-        .from('announcements')
-        .select()
-        .eq('course_id', courseId)
-        .order('is_pinned', ascending: false)
-        .order('created_at', ascending: false);
-    return data.map<Announcement>((e) => Announcement.fromJson(e)).toList();
+    return SupabaseConfig.withRetry(
+      () async {
+        final data = await SupabaseConfig.client
+            .from('announcements')
+            .select()
+            .eq('course_id', courseId)
+            .order('is_pinned', ascending: false)
+            .order('created_at', ascending: false);
+        return data.map<Announcement>((e) => Announcement.fromJson(e)).toList();
+      },
+      operationName: 'getCourseAnnouncements',
+    );
   }
 
   Future<List<AnnouncementComment>> getComments(String announcementId) async {
-    final data = await SupabaseConfig.client
-        .from('announcement_comments')
-        .select()
-        .eq('announcement_id', announcementId)
-        .order('created_at');
-    return data
-        .map<AnnouncementComment>((e) => AnnouncementComment.fromJson(e))
-        .toList();
+    return SupabaseConfig.withRetry(
+      () async {
+        final data = await SupabaseConfig.client
+            .from('announcement_comments')
+            .select()
+            .eq('announcement_id', announcementId)
+            .order('created_at');
+        return data
+            .map<AnnouncementComment>((e) => AnnouncementComment.fromJson(e))
+            .toList();
+      },
+      operationName: 'getComments',
+    );
   }
 
   Future<void> addComment(
       {required String announcementId, required String content}) async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) throw Exception('Not authenticated');
-    await SupabaseConfig.client.from('announcement_comments').insert({
-      'announcement_id': announcementId,
-      'user_id': uid,
-      'content': content,
-    });
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'Not authenticated',
+            operationName: 'addComment',
+            isAuthError: true,
+          );
+        }
+        await SupabaseConfig.client.from('announcement_comments').insert({
+          'announcement_id': announcementId,
+          'user_id': uid,
+          'content': content,
+        });
+      },
+      operationName: 'addComment',
+    );
   }
 
   Future<void> createAnnouncement({
@@ -59,22 +87,46 @@ class AnnouncementService {
     bool isPinned = false,
     bool allowComments = true,
   }) async {
-    final uid = SupabaseConfig.client.auth.currentUser?.id;
-    if (uid == null) throw Exception('Not authenticated');
-    await SupabaseConfig.client.from('announcements').insert({
-      'course_id': courseId,
-      'teacher_id': uid,
-      'title': title,
-      'content': content,
-      'is_pinned': isPinned,
-      'allow_comments': allowComments,
-    });
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'Not authenticated',
+            operationName: 'createAnnouncement',
+            isAuthError: true,
+          );
+        }
+        await SupabaseConfig.client.from('announcements').insert({
+          'course_id': courseId,
+          'teacher_id': uid,
+          'title': title,
+          'content': content,
+          'is_pinned': isPinned,
+          'allow_comments': allowComments,
+        });
+      },
+      operationName: 'createAnnouncement',
+    );
   }
 
   Future<void> deleteAnnouncement(String announcementId) async {
-    await SupabaseConfig.client
-        .from('announcements')
-        .delete()
-        .eq('id', announcementId);
+    return SupabaseConfig.withRetry(
+      () async {
+        final uid = SupabaseConfig.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw SupabaseApiException(
+            'Not authenticated',
+            operationName: 'deleteAnnouncement',
+            isAuthError: true,
+          );
+        }
+        await SupabaseConfig.client
+            .from('announcements')
+            .delete()
+            .eq('id', announcementId);
+      },
+      operationName: 'deleteAnnouncement',
+    );
   }
 }

@@ -18,12 +18,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   UserRole _selectedRole = UserRole.student;
   final _lrnController = TextEditingController();
   final _empIdController = TextEditingController();
+  final _centerController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthNeedsOnboarding) {
+      _selectedRole = authState.profile.role;
+    }
+  }
 
   @override
   void dispose() {
     _lrnController.dispose();
     _empIdController.dispose();
+    _centerController.dispose();
     super.dispose();
   }
 
@@ -161,18 +172,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                             // Teacher → Employee ID + notice
                             if (_selectedRole == UserRole.teacher) ...[
-                              TextFormField(
-                                controller: _empIdController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Employee ID *',
-                                  prefixIcon: Icon(Icons.badge_outlined),
+                                TextFormField(
+                                  controller: _empIdController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Employee ID *',
+                                    prefixIcon: Icon(Icons.badge_outlined),
+                                  ),
+                                  validator: (v) =>
+                                      (v == null || v.trim().isEmpty)
+                                          ? 'Required'
+                                          : null,
                                 ),
-                                validator: (v) =>
-                                    (v == null || v.trim().isEmpty)
-                                        ? 'Required'
-                                        : null,
-                              ),
-                              const SizedBox(height: 12),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _centerController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Center / Location *',
+                                    prefixIcon: Icon(Icons.location_on_outlined),
+                                    hintText: 'e.g. San Jose District',
+                                  ),
+                                  validator: (v) =>
+                                      (v == null || v.trim().isEmpty)
+                                          ? 'Required'
+                                          : null,
+                                ),
+                                const SizedBox(height: 12),
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
@@ -257,6 +281,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 : null,
             empId: _empIdController.text.trim().isNotEmpty
                 ? _empIdController.text.trim()
+                : null,
+            districtId: _centerController.text.trim().isNotEmpty
+                ? _centerController.text.trim()
                 : null,
           ),
         );

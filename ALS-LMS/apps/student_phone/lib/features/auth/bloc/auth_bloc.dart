@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:shared_services/shared_services.dart';
@@ -11,10 +12,14 @@ part 'auth_state.dart';
 /// BLoC handling authentication state for the student app.
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthService _authService;
+  final BiometricService _biometricService;
   StreamSubscription<supa.AuthState>? _authSubscription;
 
-  AuthBloc({required AuthService authService})
-      : _authService = authService,
+  AuthBloc({
+    required AuthService authService,
+    required BiometricService biometricService,
+  })  : _authService = authService,
+        _biometricService = biometricService,
         super(AuthInitial()) {
     on<AuthCheckRequested>(_onCheckRequested);
     on<AuthLoginWithEmailRequested>(_onLoginWithEmail);
@@ -27,7 +32,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     // Listen to auth state changes from Supabase
     _authSubscription = _authService.onAuthStateChange.listen((data) {
-      if (data.event == supa.AuthChangeEvent.signedIn) {
+      if (data.event == supa.AuthChangeEvent.signedIn ||
+          data.event == supa.AuthChangeEvent.tokenRefreshed) {
         add(AuthStateChanged(isAuthenticated: true));
       } else if (data.event == supa.AuthChangeEvent.signedOut) {
         add(AuthStateChanged(isAuthenticated: false));
@@ -57,10 +63,41 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   /// Determines the correct state for a freshly loaded profile.
-  AuthState _resolveProfileState(Profile? profile) {
-    if (profile == null) return AuthAuthenticated();
-    // New user hasn't chosen a role yet (e.g. Google sign-in).
+  AuthState _resolveProfileState(Profile? profile, {UserRole? preferredRole}) {
+    if (profile == null) {
+      final user = _authService.currentUser;
+      if (user != null) {
+        // Fresh sign-in, no profile yet. Auto-create skeleton for onboarding screen.
+        final metadata = user.userMetadata ?? {};
+        return AuthNeedsOnboarding(
+          profile: Profile(
+            id: user.id,
+            fullName: metadata['full_name'] ?? metadata['name'] ?? 'User',
+            email: user.email,
+            role: preferredRole ?? UserRole.student,
+            onboardingCompleted: false,
+            approvalStatus: ApprovalStatus.approved,
+          ),
+        );
+      }
+      return AuthUnauthenticated();
+    }
+
+    // New user hasn't finished onboarding details.
     if (!profile.onboardingCompleted) {
+      if (preferredRole != null && profile.role != preferredRole) {
+        // Update profile with the preferred role they just picked on RegisterScreen
+        return AuthNeedsOnboarding(
+          profile: Profile(
+            id: profile.id,
+            role: preferredRole,
+            fullName: profile.fullName,
+            email: profile.email,
+            onboardingCompleted: false,
+            approvalStatus: profile.approvalStatus,
+          ),
+        );
+      }
       return AuthNeedsOnboarding(profile: profile);
     }
     // Teacher registered but not yet approved.
@@ -105,15 +142,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       await _authService.signInWithGoogle();
-    } catch (e) {
-      emit(AuthError(message: _formatError(e)));
-      return;
-    }
-    try {
       final profile = await _authService.getCurrentProfile();
-      emit(_resolveProfileState(profile));
-    } catch (_) {
-      emit(const AuthAuthenticated());
+      emit(_resolveProfileState(profile, preferredRole: event.preferredRole));
+    } catch (e) {
+      if (e is supa.AuthException || e is SupabaseApiException) {
+        emit(AuthError(message: _formatError(e)));
+      } else {
+        // This might happen if user cancelled or profile fetch failed
+        // but session exists. AuthCheckRequested will handle it.
+        emit(const AuthAuthenticated());
+      }
     }
   }
 
@@ -169,6 +207,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         role: event.role,
         lrn: event.lrn,
         empId: event.empId,
+        districtId: event.districtId,
       );
       final profile = await _authService.getCurrentProfile();
       emit(_resolveProfileState(profile));
@@ -183,9 +222,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
+      // 🔒 SECURITY: Clear biometric data before logout for shared device security
+      await _biometricService.clearBiometricDataOnLogout();
+
       await _authService.signOut();
+
+      developer.log('User logged out successfully', name: 'AuthBloc');
       emit(AuthUnauthenticated());
-    } catch (e) {
+    } catch (e, stackTrace) {
+      developer.log('Logout failed',
+          error: e, stackTrace: stackTrace, name: 'AuthBloc', level: 900);
       emit(AuthError(message: _formatError(e)));
     }
   }
@@ -202,17 +248,27 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   String _formatError(dynamic error) {
-    final msg = error.toString();
-    if (msg.contains('Invalid login credentials')) {
+    final msg = error.toString().toLowerCase();
+    if (msg.contains('invalid login credentials') ||
+        msg.contains('invalid_credentials')) {
       return 'Incorrect email or password. Please try again.';
-    } else if (msg.contains('User already registered')) {
+    } else if (msg.contains('user already registered') ||
+        msg.contains('email_exists')) {
       return 'This email is already registered. Try logging in instead.';
     } else if (msg.contains('cancelled')) {
       return 'Sign-in was cancelled.';
-    } else if (msg.contains('network')) {
+    } else if (msg.contains('network') || msg.contains('connection')) {
       return 'No internet connection. Please try again when online.';
+    } else if (msg.contains('jwt') ||
+        msg.contains('token') ||
+        msg.contains('not_authorized') ||
+        msg.contains('refresh_token_not_found')) {
+      return 'Your session has expired. Please sign in again.';
+    } else if (msg.contains('email_not_verified') ||
+        msg.contains('email not verified')) {
+      return 'Please verify your email before signing in.';
     }
-    return 'An unexpected error occurred. Please try again.';
+    return 'An unexpected error occurred: ${error.toString().split("\n").first}. Please try again.';
   }
 
   @override

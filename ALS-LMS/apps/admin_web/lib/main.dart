@@ -58,6 +58,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String _avgMastery = '0.0';
   List<Map<String, dynamic>> _recentUsers = [];
   List<Map<String, dynamic>> _districts = [];
+  // Cached media future — prevents redundant queries on every setState (M-2)
+  Future<List<Map<String, dynamic>>>? _mediaFuture;
   List<Map<String, dynamic>> _courses = [];
   List<LearningCenter> _centers = [];
   List<ActivityLog> _activityLogs = [];
@@ -77,16 +79,31 @@ class _AdminDashboardState extends State<AdminDashboard> {
     try {
       final client = SupabaseConfig.client;
 
-      // Profiles
+      // Profiles — separate count queries from the display list (M-6)
+      final allProfiles = await client
+          .from('profiles')
+          .select('id, role')
+          .order('created_at', ascending: false);
+      _totalUsers = (allProfiles as List).length;
+      _totalStudents =
+          allProfiles.where((u) => u['role'] == 'student').length;
+      _totalTeachers =
+          allProfiles.where((u) => u['role'] == 'teacher').length;
+
+      // Display list — limited to 50 most recent for the table
       final profiles = await client
           .from('profiles')
           .select('id, role, full_name, email, is_active, created_at')
           .order('created_at', ascending: false)
           .limit(50);
       _recentUsers = List<Map<String, dynamic>>.from(profiles);
-      _totalUsers = _recentUsers.length;
-      _totalStudents = _recentUsers.where((u) => u['role'] == 'student').length;
-      _totalTeachers = _recentUsers.where((u) => u['role'] == 'teacher').length;
+
+      // Refresh media future (M-2)
+      _mediaFuture = SupabaseConfig.client
+          .from('lesson_media')
+          .select('*, lessons(title)')
+          .order('created_at', ascending: false)
+          .then((r) => List<Map<String, dynamic>>.from(r));
 
       // Districts
       final districts = await client.from('districts').select();
@@ -123,12 +140,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
         }
       } catch (_) {}
 
-      // Analytics
+      // Analytics — use sentinel to detect RPC failure (H-4)
       try {
         final analytics = await _systemService.getGlobalAnalytics();
-        _totalStorage = analytics['total_storage_gb']?.toString() ?? '0.00';
-        _avgMastery = analytics['avg_mastery_score']?.toString() ?? '0.0';
-      } catch (_) {}
+        if (analytics['_error'] == true) {
+          _totalStorage = 'N/A';
+          _avgMastery = 'N/A';
+        } else {
+          _totalStorage =
+              analytics['total_storage_gb']?.toString() ?? '0.00';
+          _avgMastery =
+              analytics['avg_mastery_score']?.toString() ?? '0.0';
+        }
+      } catch (_) {
+        _totalStorage = 'N/A';
+        _avgMastery = 'N/A';
+      }
 
       // Pending teachers
       try {
@@ -1333,7 +1360,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ],
             ),
           ),
-          FutureBuilder<List<Map<String, dynamic>>>(
+          FutureBuilder<List<Module>>(
             future: CourseService().getModules(courseId),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1351,9 +1378,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               }
               return Column(
                 children: modules.map((module) {
-                  final moduleTitle =
-                      module['title']?.toString() ?? 'Untitled Module';
-                  final moduleId = module['id'] as String;
+                  final moduleTitle = module.title;
+                  final moduleId = module.id;
                   return ExpansionTile(
                     leading: const Icon(Icons.view_module, size: 20),
                     title:
@@ -1377,7 +1403,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ],
                         ),
                       ),
-                      FutureBuilder<List<Map<String, dynamic>>>(
+                      FutureBuilder<List<Lesson>>(
                         future: CourseService().getLessons(moduleId),
                         builder: (context, lessonSnap) {
                           if (lessonSnap.connectionState ==
@@ -1406,13 +1432,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 dense: true,
                                 leading: const Icon(Icons.article, size: 18),
                                 title: Text(
-                                  lesson['title']?.toString() ??
-                                      'Untitled Lesson',
+                                  lesson.title,
                                   style: const TextStyle(fontSize: 13),
                                 ),
                                 subtitle: Text(
-                                  (lesson['content_type']?.toString() ?? 'text')
-                                      .replaceAll('_', ' '),
+                                  lesson.contentType.name.replaceAll('_', ' '),
                                   style: const TextStyle(fontSize: 11),
                                 ),
                               );
@@ -2405,16 +2429,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildMediaTable() {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: SupabaseConfig.client
-          .from('lesson_media')
-          .select('*, lessons(title)')
-          .order('created_at', ascending: false),
+      // Use the cached future from _loadData so rebuild doesn't re-query (M-2)
+      future: _mediaFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
               child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Text(
+                'Failed to load media: ${snapshot.error}',
+                style: TextStyle(color: AlsColors.error),
+              ),
             ),
           );
         }
@@ -2549,16 +2582,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         );
 
-        // For testing, we find the first lesson ID if it exists, or use a dummy.
-        String lessonId;
+        // Look up an existing lesson to associate the media with (C-5)
         final lessons =
             await SupabaseConfig.client.from('lessons').select('id').limit(1);
-        if ((lessons as List).isNotEmpty) {
-          lessonId = lessons.first['id'];
-        } else {
-          // If no lessons, create one or use dummy UUID
-          lessonId = '00000000-0000-0000-0000-000000000000';
+        if ((lessons as List).isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'No lessons exist yet. Create a course → module → lesson first.'),
+                backgroundColor: AlsColors.warning,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+          return; // Abort upload cleanly
         }
+        final lessonId = lessons.first['id'] as String;
 
         final type = _inferFileType(file.extension ?? '');
 
@@ -2725,12 +2765,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ElevatedButton(
               onPressed: () async {
                 if (titleCtrl.text.trim().isEmpty) return;
+                // Guard: teacher_id cannot be empty string (M-5)
+                if (selectedTeacherId == null ||
+                    selectedTeacherId!.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Please select a teacher for this course.'),
+                    ),
+                  );
+                  return;
+                }
                 try {
                   await _courseServiceAdmin.createCourse(
                     title: titleCtrl.text.trim(),
                     description: descCtrl.text.trim(),
                     strand: selectedStrand,
-                    teacherId: selectedTeacherId ?? '',
+                    teacherId: selectedTeacherId!,
                     pinCode: pinCtrl.text.trim().isNotEmpty
                         ? pinCtrl.text.trim()
                         : null,

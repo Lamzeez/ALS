@@ -22,13 +22,13 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   final _announcementService = AnnouncementService();
   final _systemService = SystemService();
 
-  List<Map<String, dynamic>> _courses = [];
+  List<Course> _courses = [];
   bool _isLoadingCourses = true;
   bool _isMaintenanceMode = false;
   String? _maintenanceMessage;
 
   // Selected course for student/announcement view
-  Map<String, dynamic>? _selectedCourse;
+  Course? _selectedCourse;
 
   @override
   void initState() {
@@ -207,11 +207,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     );
   }
 
-  Widget _buildCourseCard(Map<String, dynamic> course) {
-    final title = course['title'] as String? ?? 'Untitled';
-    final strand = course['strand'] as String? ?? '';
-    final strandColor = _getStrandColor(strand);
-    final isSelected = _selectedCourse?['id'] == course['id'];
+  Widget _buildCourseCard(Course course) {
+    final title = course.title;
+    final strand = course.strand;
+    final strandName = strand.name;
+    final strandColor = _getStrandColor(strandName);
+    final isSelected = _selectedCourse?.id == course.id;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -246,7 +247,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                             .textTheme
                             .titleMedium
                             ?.copyWith(fontWeight: FontWeight.w600)),
-                    Text(_formatStrand(strand),
+                    Text(_formatStrand(strandName),
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
@@ -411,7 +412,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 // Sub-widget: Announcements manager for teacher
 // ─────────────────────────────────────────────────────────────────────
 class _AnnouncementsManager extends StatefulWidget {
-  final Map<String, dynamic> course;
+  final Course course;
   final AnnouncementService announcementService;
 
   const _AnnouncementsManager(
@@ -434,14 +435,14 @@ class _AnnouncementsManagerState extends State<_AnnouncementsManager> {
   @override
   void didUpdateWidget(_AnnouncementsManager old) {
     super.didUpdateWidget(old);
-    if (old.course['id'] != widget.course['id']) _load();
+    if (old.course.id != widget.course.id) _load();
   }
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
     try {
       _announcements = await widget.announcementService
-          .getCourseAnnouncements(widget.course['id'] as String);
+          .getCourseAnnouncements(widget.course.id);
     } catch (e) {
       debugPrint('[Teacher] Error loading announcements: $e');
     } finally {
@@ -574,7 +575,7 @@ class _AnnouncementsManagerState extends State<_AnnouncementsManager> {
                         if (title.isEmpty || content.isEmpty) return;
                         try {
                           await widget.announcementService.createAnnouncement(
-                            courseId: widget.course['id'] as String,
+                            courseId: widget.course.id,
                             title: title,
                             content: content,
                             isPinned: isPinned,
@@ -606,7 +607,7 @@ class _AnnouncementsManagerState extends State<_AnnouncementsManager> {
 // Sub-widget: Students list for teacher
 // ─────────────────────────────────────────────────────────────────────
 class _StudentsView extends StatefulWidget {
-  final Map<String, dynamic> course;
+  final Course course;
   final CourseService courseService;
 
   const _StudentsView({required this.course, required this.courseService});
@@ -616,7 +617,7 @@ class _StudentsView extends StatefulWidget {
 }
 
 class _StudentsViewState extends State<_StudentsView> {
-  List<Map<String, dynamic>> _enrollments = [];
+  List<Profile> _enrollments = [];
   bool _isLoading = true;
 
   @override
@@ -628,14 +629,14 @@ class _StudentsViewState extends State<_StudentsView> {
   @override
   void didUpdateWidget(_StudentsView old) {
     super.didUpdateWidget(old);
-    if (old.course['id'] != widget.course['id']) _load();
+    if (old.course.id != widget.course.id) _load();
   }
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
     try {
       _enrollments = await widget.courseService
-          .getCourseStudents(widget.course['id'] as String);
+          .getCourseStudents(widget.course.id);
     } catch (e) {
       debugPrint('[Teacher] Error loading students: $e');
     } finally {
@@ -645,7 +646,7 @@ class _StudentsViewState extends State<_StudentsView> {
 
   @override
   Widget build(BuildContext context) {
-    final courseTitle = widget.course['title'] as String? ?? 'Course';
+    final courseTitle = widget.course.title;
 
     return _isLoading
         ? const Center(child: CircularProgressIndicator())
@@ -683,12 +684,10 @@ class _StudentsViewState extends State<_StudentsView> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: _enrollments.length,
                           itemBuilder: (_, i) {
-                            final profile = _enrollments[i]['profiles']
-                                as Map<String, dynamic>?;
-                            final name = profile?['full_name'] as String? ??
-                                'Unknown Student';
-                            final email = profile?['email'] as String? ?? '';
-                            final lrn = profile?['lrn'] as String?;
+                            final profile = _enrollments[i];
+                            final name = profile.fullName;
+                            final email = profile.email ?? '';
+                            final lrn = profile.lrn;
                             return ListTile(
                               leading: CircleAvatar(
                                 backgroundColor: AlsColors.primarySurface,

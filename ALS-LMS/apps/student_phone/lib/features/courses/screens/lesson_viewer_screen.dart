@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_models/shared_models.dart';
 import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'quiz_screen.dart';
 
 class LessonViewerScreen extends StatefulWidget {
-  final Map<String, dynamic> lesson;
+  final Lesson lesson;
   final String moduleId;
   final String courseId;
   final int moduleLessonsCount;
@@ -25,8 +26,8 @@ class LessonViewerScreen extends StatefulWidget {
 
 class _LessonViewerScreenState extends State<LessonViewerScreen> {
   final _courseService = CourseService();
-  List<Map<String, dynamic>> _media = [];
-  Map<String, dynamic>? _quiz;
+  List<LessonMedia> _media = [];
+  Quiz? _quiz;
   bool _isLoadingMedia = true;
   bool _isLoadingQuiz = true;
 
@@ -40,7 +41,7 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
   Future<void> _loadMedia() async {
     try {
       _media = await _courseService.getLessonMedia(
-        widget.lesson['id'] as String,
+        widget.lesson.id,
       );
     } catch (e) {
       debugPrint('Error loading media: $e');
@@ -52,7 +53,7 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
   Future<void> _loadQuiz() async {
     try {
       _quiz = await _courseService.getQuizForLesson(
-        widget.lesson['id'] as String,
+        widget.lesson.id,
       );
     } catch (e) {
       debugPrint('Error loading quiz: $e');
@@ -62,7 +63,7 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
   }
 
   String _getContentText() {
-    final contentJson = widget.lesson['content_json'];
+    final contentJson = widget.lesson.contentJson;
     if (contentJson == null) return '';
     if (contentJson is Map) {
       return contentJson['text']?.toString() ?? '';
@@ -72,10 +73,10 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.lesson['title'] as String? ?? 'Lesson';
-    final contentType = widget.lesson['content_type'] as String? ?? 'text';
+    final title = widget.lesson.title;
+    final contentType = widget.lesson.contentType;
     final contentText = _getContentText();
-    final durationMins = (widget.lesson['duration_minutes'] as num?)?.toInt();
+    final durationMins = widget.lesson.durationMinutes;
 
     return Scaffold(
       appBar: AppBar(
@@ -133,7 +134,7 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  contentType.replaceAll('_', ' ').toUpperCase(),
+                  contentType.name.replaceAll('_', ' ').toUpperCase(),
                   style: TextStyle(
                     color: AlsColors.primary,
                     fontWeight: FontWeight.w600,
@@ -199,11 +200,11 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
     );
   }
 
-  Widget _buildMediaCard(Map<String, dynamic> media) {
-    final fileName = media['file_name'] as String? ?? 'File';
-    final fileType = media['file_type'] as String? ?? 'document';
-    final storageUrl = media['storage_url'] as String? ?? '';
-    final fileSizeBytes = (media['file_size_bytes'] as num?)?.toInt();
+  Widget _buildMediaCard(LessonMedia media) {
+    final fileName = media.fileName;
+    final fileType = media.fileType;
+    final storageUrl = media.storageUrl ?? '';
+    final fileSizeBytes = media.fileSizeBytes;
 
     IconData icon;
     switch (fileType) {
@@ -239,7 +240,7 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
         subtitle: Text(
           fileSizeBytes != null
               ? '${(fileSizeBytes / 1024 / 1024).toStringAsFixed(1)} MB'
-              : fileType,
+              : fileType.name,
           style: TextStyle(fontSize: 12, color: AlsColors.textSecondary),
         ),
         trailing: IconButton(
@@ -251,9 +252,9 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
   }
 
   Widget _buildQuizCard() {
-    final quizTitle = _quiz!['title'] as String? ?? 'Quiz';
-    final timeLimit = (_quiz!['time_limit_mins'] as num?)?.toInt();
-    final maxAttempts = (_quiz!['max_attempts'] as num?)?.toInt() ?? 3;
+    final quizTitle = _quiz!.title;
+    final timeLimit = _quiz!.timeLimitMins;
+    final maxAttempts = _quiz!.maxAttempts;
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -344,8 +345,8 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
     }
   }
 
-  IconData _getContentIcon(String type) {
-    switch (type) {
+  IconData _getContentIcon(LessonContentType type) {
+    switch (type.name) {
       case 'video':
         return Icons.play_circle_outline;
       case 'pdf':

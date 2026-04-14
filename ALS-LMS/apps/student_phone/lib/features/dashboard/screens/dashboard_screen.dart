@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_models/shared_models.dart';
 import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
 
@@ -24,9 +25,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _systemService = SystemService();
   final _announcementService = AnnouncementService();
 
-  List<Map<String, dynamic>> _enrolledCourses = [];
-  List<Map<String, dynamic>> _announcements = [];
-  Map<String, List<Map<String, dynamic>>> _courseProgress = {};
+  List<CourseEnrollment> _enrolledCourses = [];
+  List<Announcement> _announcements = [];
+  Map<String, List<ModuleProgress>> _courseProgress = {};
   bool _isLoadingCourses = true;
   bool _isLoadingAnnouncements = true;
   bool _isMaintenanceMode = false;
@@ -60,14 +61,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _enrolledCourses = await _courseService.getEnrolledCourses();
       // Load progress for each course
       for (final enrollment in _enrolledCourses) {
-        final course = enrollment['courses'] as Map<String, dynamic>?;
-        if (course != null) {
-          final courseId = course['id'] as String;
-          try {
-            _courseProgress[courseId] =
-                await _courseService.getModuleProgress(courseId);
-          } catch (_) {}
-        }
+        final courseId = enrollment.courseId;
+        try {
+          _courseProgress[courseId] =
+              await _courseService.getModuleProgress(courseId);
+        } catch (_) {}
       }
     } catch (e) {
       debugPrint('Error loading courses: $e');
@@ -312,7 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildEmptyCourseState()
           else
             ..._enrolledCourses.map((enrollment) {
-              final course = enrollment['courses'] as Map<String, dynamic>?;
+              final course = enrollment.course;
               if (course == null) return const SizedBox.shrink();
               return _buildCourseCard(course, enrollment);
             }),
@@ -357,12 +355,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildCourseCard(
-      Map<String, dynamic> course, Map<String, dynamic> enrollment) {
-    final title = course['title'] as String? ?? 'Untitled Course';
-    final description = course['description'] as String? ?? '';
-    final strandStr = course['strand'] as String? ?? 'communication_skills';
+  Widget _buildCourseCard(Course course, CourseEnrollment enrollment) {
+    final title = course.title;
+    final description = course.description ?? '';
+    final strandStr = course.strand.name;
     final strandColor = _getStrandColor(strandStr);
+    final isSelected = false; // Not used in this screen but kept for consistency
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -375,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => CourseDetailScreen(
-                courseId: course['id'] as String,
+                courseId: course.id,
                 courseTitle: title,
               ),
             ),
@@ -467,8 +465,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          enrollment['status']?.toString().toUpperCase() ??
-                              'ACTIVE',
+                          enrollment.status.name.toUpperCase(),
                           style: TextStyle(
                             color: AlsColors.secondary,
                             fontWeight: FontWeight.w600,
@@ -523,11 +520,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _announcements.length,
+              itemCount: _announcements.length,
                   itemBuilder: (context, index) {
                     final ann = _announcements[index];
-                    final courseName =
-                        (ann['courses'] as Map?)?['title'] ?? 'Course';
+                    final courseName = ann.course?.title ?? 'Course';
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
@@ -544,7 +540,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    ann['title'] ?? 'Announcement',
+                                    ann.title,
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleMedium
@@ -568,7 +564,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              ann['content'] ?? '',
+                              ann.content,
                               style: Theme.of(context).textTheme.bodyMedium,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
@@ -621,14 +617,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _courseProgress.values.expand((p) => p).toList();
             final completedModules = allProgress
                 .where((p) =>
-                    p['status'] == 'completed' || p['status'] == 'mastered')
+                    p.status == ProgressStatus.completed ||
+                    p.status == ProgressStatus.mastered)
                 .length;
             final avgMastery = allProgress.isNotEmpty
                 ? allProgress.fold<double>(
-                        0,
-                        (sum, p) =>
-                            sum +
-                            ((p['mastery_score'] as num?)?.toDouble() ?? 0)) /
+                        0, (sum, p) => sum + (p.masteryScore ?? 0)) /
                     allProgress.length
                 : 0.0;
 
@@ -670,7 +664,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildProgressMetric(
                         'Active',
-                        '${_enrolledCourses.where((e) => e['status'] == 'active').length}',
+                        '${_enrolledCourses.where((e) => e.status == EnrollmentStatus.active).length}',
                         Icons.play_circle_outline,
                         AlsColors.warning,
                       ),
@@ -687,7 +681,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 12),
 
           ..._enrolledCourses.map((enrollment) {
-            final course = enrollment['courses'] as Map<String, dynamic>?;
+            final course = enrollment.course;
             if (course == null) return const SizedBox.shrink();
             return _buildProgressCard(course);
           }),
@@ -725,21 +719,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildProgressCard(Map<String, dynamic> course) {
-    final title = course['title'] as String? ?? 'Untitled';
-    final courseId = course['id'] as String;
+  Widget _buildProgressCard(Course course) {
+    final title = course.title;
+    final courseId = course.id;
     final progress = _courseProgress[courseId] ?? [];
     final totalModules = progress.length;
     final completedModules = progress
-        .where((p) => p['status'] == 'completed' || p['status'] == 'mastered')
+        .where((p) =>
+            p.status == ProgressStatus.completed ||
+            p.status == ProgressStatus.mastered)
         .length;
     final overallProgress =
         totalModules > 0 ? completedModules / totalModules : 0.0;
     final avgMastery = totalModules > 0
-        ? progress.fold<double>(
-                0,
-                (sum, p) =>
-                    sum + ((p['mastery_score'] as num?)?.toDouble() ?? 0)) /
+        ? progress.fold<double>(0, (sum, p) => sum + (p.masteryScore ?? 0)) /
             totalModules
         : 0.0;
 
@@ -794,28 +787,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Per-module breakdown
             if (progress.isNotEmpty) ...[
               const SizedBox(height: 12),
-              ...progress.map((p) {
-                final moduleTitle =
-                    (p['modules'] as Map?)?['title'] ?? 'Module';
-                final mastery = (p['mastery_score'] as num?)?.toDouble() ?? 0;
-                final status = p['status'] as String? ?? 'locked';
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Icon(
-                        status == 'completed' || status == 'mastered'
-                            ? Icons.check_circle
-                            : status == 'in_progress'
-                                ? Icons.play_circle
-                                : Icons.radio_button_unchecked,
-                        size: 16,
-                        color: status == 'completed' || status == 'mastered'
-                            ? AlsColors.success
-                            : status == 'in_progress'
-                                ? AlsColors.warning
-                                : AlsColors.textHint,
-                      ),
+                ...progress.map((p) {
+                  final moduleTitle = p.moduleTitle ?? 'Module';
+                  final mastery = p.masteryScore ?? 0;
+                  final status = p.status.name;
+                  final isDone = status == 'completed' || status == 'mastered';
+                  final isInProgress = status == 'in_progress';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isDone
+                              ? Icons.check_circle
+                              : isInProgress
+                                  ? Icons.play_circle
+                                  : Icons.radio_button_unchecked,
+                          size: 16,
+                          color: isDone
+                              ? AlsColors.success
+                              : isInProgress
+                                  ? AlsColors.warning
+                                  : AlsColors.textHint,
+                        ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(

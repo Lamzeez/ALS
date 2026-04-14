@@ -70,6 +70,9 @@ class Profile extends Equatable {
       device_id TEXT,
       phone_number TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
+      approval_status TEXT NOT NULL DEFAULT 'approved',
+      onboarding_completed INTEGER NOT NULL DEFAULT 1,
+      employee_id TEXT,
       created_at TEXT,
       updated_at TEXT
     )
@@ -86,6 +89,9 @@ class Profile extends Equatable {
         'device_id': deviceId,
         'phone_number': phoneNumber,
         'is_active': isActive ? 1 : 0,
+        'approval_status': approvalStatus.toJson(),
+        'onboarding_completed': onboardingCompleted ? 1 : 0,
+        'employee_id': employeeId,
         'created_at': createdAt?.toIso8601String(),
         'updated_at': updatedAt?.toIso8601String(),
       };
@@ -101,6 +107,10 @@ class Profile extends Equatable {
         deviceId: map['device_id'] as String?,
         phoneNumber: map['phone_number'] as String?,
         isActive: (map['is_active'] as int?) == 1,
+        approvalStatus: ApprovalStatus.fromJson(
+            map['approval_status'] as String? ?? 'approved'),
+        onboardingCompleted: (map['onboarding_completed'] as int?) == 1,
+        employeeId: map['employee_id'] as String?,
         createdAt: map['created_at'] != null
             ? DateTime.parse(map['created_at'] as String)
             : null,

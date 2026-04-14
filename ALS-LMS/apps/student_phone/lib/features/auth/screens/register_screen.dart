@@ -399,7 +399,11 @@ class _RegisterScreenState extends State<RegisterScreen>
             // Google Register
             OutlinedButton.icon(
               onPressed: () {
-                context.read<AuthBloc>().add(AuthLoginWithGoogleRequested());
+                context.read<AuthBloc>().add(
+                      AuthLoginWithGoogleRequested(
+                        preferredRole: _selectedRole,
+                      ),
+                    );
               },
               icon: const Icon(Icons.g_mobiledata, size: 24),
               label: const Text('Register with Google'),

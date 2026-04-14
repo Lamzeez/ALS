@@ -29,6 +29,8 @@ class ModuleProgress extends Equatable {
   final DateTime? completedAt;
   @JsonKey(name: 'synced_at')
   final DateTime? syncedAt;
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  final String? moduleTitle;
 
   const ModuleProgress({
     required this.id,
@@ -43,10 +45,26 @@ class ModuleProgress extends Equatable {
     this.startedAt,
     this.completedAt,
     this.syncedAt,
+    this.moduleTitle,
   });
 
-  factory ModuleProgress.fromJson(Map<String, dynamic> json) =>
-      _$ModuleProgressFromJson(json);
+  factory ModuleProgress.fromJson(Map<String, dynamic> json) {
+    return ModuleProgress(
+      id: json['id'] as String,
+      studentId: json['student_id'] as String,
+      moduleId: json['module_id'] as String,
+      courseId: json['course_id'] as String,
+      status: ProgressStatus.fromJson(json['status'] as String),
+      masteryScore: (json['mastery_score'] as num?)?.toDouble() ?? 0.0,
+      lessonsViewed: (json['lessons_viewed'] as int?) ?? 0,
+      totalLessons: (json['total_lessons'] as int?) ?? 0,
+      timeSpentMins: (json['time_spent_mins'] as int?) ?? 0,
+      startedAt: json['started_at'] != null ? DateTime.parse(json['started_at'] as String) : null,
+      completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at'] as String) : null,
+      syncedAt: json['synced_at'] != null ? DateTime.parse(json['synced_at'] as String) : null,
+      moduleTitle: (json['modules'] as Map?)?['title'] as String?,
+    );
+  }
   Map<String, dynamic> toJson() => _$ModuleProgressToJson(this);
 
   static String _statusToJson(ProgressStatus s) => s.toJson();
