@@ -21,3 +21,6 @@ node_modules/
 # OS and logs
 **/.DS_Store
 **/*.log
+
+# qwen
+.qwen/

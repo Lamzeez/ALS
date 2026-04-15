@@ -209,18 +209,18 @@ DROP POLICY IF EXISTS users_update_self           ON public.users;
 -- Any authenticated user can read their own row; admins can read all rows.
 CREATE POLICY users_select ON public.users FOR SELECT
   USING (
-    auth.uid()::text = id
+    auth.uid() = id
     OR public.current_user_role() = 'admin'
   );
 
 -- A user can only insert their own row (auth uid must equal id).
 CREATE POLICY users_insert ON public.users FOR INSERT
-  WITH CHECK (auth.uid()::text = id);
+  WITH CHECK (auth.uid() = id);
 
 -- A user can update their own row; admins can update any row.
 CREATE POLICY users_update ON public.users FOR UPDATE
   USING (
-    auth.uid()::text = id
+    auth.uid() = id
     OR public.current_user_role() = 'admin'
   );
 
