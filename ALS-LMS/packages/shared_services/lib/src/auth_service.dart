@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_models/shared_models.dart';
@@ -78,7 +79,8 @@ class AuthService {
     try {
       print('[ALS-AUTH] Initiating Native Google Sign-In...');
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        serverClientId: '449723385926-auv1027j4frutqtujit7vi1sqhl4b5ui.apps.googleusercontent.com',
+        clientId: '533484169526-nno4lgasipup831poncgjlqkh5l3hgu4.apps.googleusercontent.com',
+        serverClientId: kIsWeb ? null : '533484169526-nno4lgasipup831poncgjlqkh5l3hgu4.apps.googleusercontent.com',
       );
       
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();

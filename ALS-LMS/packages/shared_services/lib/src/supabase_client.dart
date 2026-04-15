@@ -5,12 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SupabaseConfig {
   static const String _url = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://pgfhypaqpzypjofbyugi.supabase.co',
+    defaultValue: 'https://trixvamgvaihvuqpyjwc.supabase.co',
   );
   static const String _anonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
     defaultValue:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnZmh5cGFxcHp5cGpvZmJ5dWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjQ0MDUsImV4cCI6MjA5MDA0MDQwNX0.UGjgQHXoi5GGiwYBlSuUIfMUylfTJLFgScco5w4JCUA',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyaXh2YW1ndmFpaHZ1cXB5andjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNzU3MDUsImV4cCI6MjA5MTc1MTcwNX0.FgJpB5VvimONIS11L1_LvB-G-5M4S7l8xPS2O2w4F5s',
   );
 
   // 🚀 API Configuration

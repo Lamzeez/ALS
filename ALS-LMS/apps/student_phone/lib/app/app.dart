@@ -1,27 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_models/shared_models.dart';
-import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
+import 'package:shared_services/shared_services.dart';
 
 import '../features/auth/bloc/auth_bloc.dart';
-import '../features/auth/screens/login_screen.dart';
-import '../features/auth/screens/register_screen.dart';
-import '../features/auth/screens/pending_approval_screen.dart';
-import '../features/auth/screens/onboarding_screen.dart';
-import '../features/dashboard/screens/dashboard_screen.dart';
-import '../features/teacher/screens/teacher_dashboard_screen.dart';
-import '../features/splash/screens/splash_screen.dart';
-import '../features/enrollment/screens/enroll_course_screen.dart';
+import 'router.dart';
 
 /// Root widget of the ALS Student App.
-class AlsStudentApp extends StatelessWidget {
+class AlsStudentApp extends StatefulWidget {
   final ConnectivityService connectivityService;
 
   const AlsStudentApp({
     super.key,
     required this.connectivityService,
   });
+
+  @override
+  State<AlsStudentApp> createState() => _AlsStudentAppState();
+}
+
+class _AlsStudentAppState extends State<AlsStudentApp> {
+  late final AuthBloc _authBloc;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize AuthBloc here so we can pass it to the Router
+    _authBloc = AuthBloc(
+      authService: AuthService(),
+      biometricService: BiometricService(),
+    )..add(AuthCheckRequested());
+  }
+
+  @override
+  void dispose() {
+    _authBloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +49,7 @@ class AlsStudentApp extends StatelessWidget {
           create: (_) => BiometricService(),
         ),
         RepositoryProvider<ConnectivityService>.value(
-          value: connectivityService,
+          value: widget.connectivityService,
         ),
         RepositoryProvider<CourseService>(
           create: (_) => CourseService(),
@@ -46,53 +61,17 @@ class AlsStudentApp extends StatelessWidget {
           create: (_) => SystemService(),
         ),
       ],
-      child: BlocProvider(
-        create: (context) => AuthBloc(
-          authService: context.read<AuthService>(),
-          biometricService: context.read<BiometricService>(),
-        )..add(AuthCheckRequested()),
-        child: MaterialApp(
+      child: BlocProvider.value(
+        value: _authBloc,
+        child: MaterialApp.router(
           title: 'ALS Student',
           debugShowCheckedModeBanner: false,
           theme: AlsTheme.lightTheme,
           darkTheme: AlsTheme.darkTheme,
           themeMode: ThemeMode.system,
-          routes: {
-            '/': (context) => _buildHomeScreen(context),
-            '/login': (context) => const LoginScreen(),
-            '/register': (context) => const RegisterScreen(),
-            '/dashboard': (context) => const DashboardScreen(),
-            '/enroll': (context) => const EnrollCourseScreen(),
-          },
-          initialRoute: '/',
+          routerConfig: AlsRouter.createRouter(_authBloc),
         ),
       ),
-    );
-  }
-
-  Widget _buildHomeScreen(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, state) {
-        if (state is AuthLoading) {
-          return const SplashScreen();
-        } else if (state is AuthNeedsOnboarding) {
-          // Brand-new Google sign-in — pick role
-          return const OnboardingScreen();
-        } else if (state is AuthPendingApproval) {
-          // Teacher registered but not yet approved
-          return const PendingApprovalScreen();
-        } else if (state is AuthAuthenticated) {
-          final role = state.profile?.role;
-          if (role == UserRole.teacher ||
-              role == UserRole.schoolAdmin ||
-              role == UserRole.devAdmin) {
-            return const TeacherDashboardScreen();
-          }
-          return const DashboardScreen();
-        } else {
-          return const LoginScreen();
-        }
-      },
     );
   }
 }

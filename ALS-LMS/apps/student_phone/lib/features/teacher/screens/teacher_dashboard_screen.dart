@@ -5,7 +5,7 @@ import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
 
 import '../../auth/bloc/auth_bloc.dart';
-import '../../dashboard/screens/settings_screen.dart';
+import '../../student/dashboard/screens/settings_screen.dart';
 
 /// Dashboard for teacher and admin users.
 /// Tabs: My Courses | Announcements | Students | Profile

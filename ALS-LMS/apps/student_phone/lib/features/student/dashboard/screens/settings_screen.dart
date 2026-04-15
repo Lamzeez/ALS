@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
 
-import '../../auth/bloc/auth_bloc.dart';
+import '../../../auth/bloc/auth_bloc.dart';
 
 /// Settings screen — change name, student ID, password.
 class SettingsScreen extends StatefulWidget {

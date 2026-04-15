@@ -13,6 +13,7 @@ dependencies:
   # State Management
   flutter_bloc: ^8.1.6
   equatable: ^2.0.7
+  go_router: ^14.0.0
 
   # Supabase & Auth
   supabase_flutter: ^2.8.0
@@ -39,6 +40,10 @@ dependencies:
   # Camera & Media
   image_picker: ^1.1.2
   mobile_scanner: ^5.2.3
+  video_player: ^2.9.2
+  chewie: ^1.8.5
+  syncfusion_flutter_pdfviewer: ^27.1.58
+  url_launcher: ^6.3.1
 
   # Utilities
   uuid: ^4.5.1

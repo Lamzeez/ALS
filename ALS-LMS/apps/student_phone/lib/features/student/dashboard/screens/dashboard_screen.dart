@@ -4,11 +4,11 @@ import 'package:shared_models/shared_models.dart';
 import 'package:shared_services/shared_services.dart';
 import 'package:shared_ui/shared_ui.dart';
 
-import '../../auth/bloc/auth_bloc.dart';
+import '../../../auth/bloc/auth_bloc.dart';
 import '../../enrollment/screens/enroll_course_screen.dart';
-import '../../courses/screens/course_detail_screen.dart';
-import '../../maintenance/screens/maintenance_screen.dart';
-import '../screens/settings_screen.dart';
+import '../../../courses/screens/course_detail_screen.dart';
+import '../../../maintenance/screens/maintenance_screen.dart';
+import 'settings_screen.dart';
 
 /// Main dashboard screen — enrolled courses from DB, progress tracking,
 /// announcements, and maintenance mode handling.
