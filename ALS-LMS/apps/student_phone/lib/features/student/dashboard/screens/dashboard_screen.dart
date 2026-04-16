@@ -128,10 +128,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () => setState(() => _currentIndex = 3),
                 child: CircleAvatar(
                   backgroundColor: Colors.white24,
-                  backgroundImage: profile?.avatarUrl != null
-                      ? NetworkImage(profile!.avatarUrl!)
+                  backgroundImage: profile?.profilePictureUrl != null
+                      ? NetworkImage(profile!.profilePictureUrl!)
                       : null,
-                  child: profile?.avatarUrl == null
+                  child: profile?.profilePictureUrl == null
                       ? Text(initial,
                           style: const TextStyle(
                               color: Colors.white, fontWeight: FontWeight.bold))
@@ -861,10 +861,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     CircleAvatar(
                       radius: 50,
                       backgroundColor: AlsColors.primarySurface,
-                      backgroundImage: profile?.avatarUrl != null
-                          ? NetworkImage(profile!.avatarUrl!)
+                      backgroundImage: profile?.profilePictureUrl != null
+                          ? NetworkImage(profile!.profilePictureUrl!)
                           : null,
-                      child: profile?.avatarUrl == null
+                      child: profile?.profilePictureUrl == null
                           ? Text(
                               profile?.fullName.isNotEmpty == true
                                   ? profile!.fullName[0].toUpperCase()
@@ -908,11 +908,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
-            if (profile?.lrn != null) ...[
+            if (profile?.studentIdNumber != null) ...[
               const SizedBox(height: 4),
               Center(
                 child: Chip(
-                  label: Text('LRN: ${profile!.lrn}'),
+                  label: Text('LRN: ${profile!.studentIdNumber}'),
                   avatar: const Icon(Icons.badge, size: 16),
                 ),
               ),

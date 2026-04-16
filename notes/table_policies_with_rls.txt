@@ -1,0 +1,132 @@
+TABLE NAMES
+-----------
+announcement_comments
+announcements
+audit_logs
+center_teachers
+course_enrollments
+courses
+districts (UNRESTRICTED)
+downloads
+learning_centers (UNRESTRICTED)
+lessons
+module_progress
+modules
+profiles
+questions
+quizzes
+scores
+sessions
+students
+system_settings
+teachers
+
+RLS POLICIES
+------------
+
+TABLE: announcement_comments
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+announcement_comments_delete   | DELETE  | public
+announcement_comments_insert   | INSERT  | public
+announcement_comments_select   | SELECT  | public
+
+TABLE: announcements
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+announcements_student_select   | SELECT  | public
+announcements_teacher_all      | ALL     | public
+
+TABLE: audit_logs
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+audit_logs_insert_policy       | INSERT  | public
+audit_logs_select_policy       | SELECT  | public
+
+TABLE: center_teachers
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+center_teachers_admin_all      | ALL     | public
+center_teachers_select         | SELECT  | public
+
+TABLE: course_enrollments
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+Students_Insert_Own_Enrollments| INSERT  | public
+Students_View_Own_Enrollments  | SELECT  | public
+
+TABLE: courses
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+LMS_Content_Select             | SELECT  | public
+
+TABLE: downloads
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+downloads_student_all          | ALL     | public
+
+TABLE: lessons
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+LMS_Lesson_Select              | SELECT  | public
+
+TABLE: module_progress
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+Students_Manage_Own_Progress   | ALL     | public
+
+TABLE: modules
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+LMS_Module_Select              | SELECT  | public
+
+TABLE: profiles
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+Profiles_Read_Policy           | SELECT  | public
+Profiles_Update_Policy         | UPDATE  | public
+
+TABLE: questions
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+LMS_Question_Select            | SELECT  | public
+
+TABLE: quizzes
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+LMS_Quiz_Select                | SELECT  | public
+
+TABLE: scores
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+Students_Insert_Own_Scores     | INSERT  | public
+Students_View_Own_Scores       | SELECT  | public
+
+TABLE: sessions
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+sessions_student_select        | SELECT  | public
+sessions_teacher_all           | ALL     | public
+
+TABLE: students
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+students_admin_all             | ALL     | public
+students_own_insert            | INSERT  | public
+students_own_select            | SELECT  | public
+students_own_update            | UPDATE  | public
+students_teacher_select        | SELECT  | public
+
+TABLE: system_settings
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+system_settings_admin_all      | ALL     | public
+
+TABLE: teachers
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+teachers_admin_all             | ALL     | public
+teachers_own_insert            | INSERT  | public
+teachers_own_select            | SELECT  | public
+teachers_own_update            | UPDATE  | public
+teachers_student_select        | SELECT  | public

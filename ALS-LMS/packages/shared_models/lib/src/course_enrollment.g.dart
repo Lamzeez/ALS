@@ -22,25 +22,19 @@ CourseEnrollment _$CourseEnrollmentFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['enrolled_at'] as String),
       courseTitle: json['course_title'] as String?,
       courseDescription: json['course_description'] as String?,
+      course: json['course'] == null
+          ? null
+          : Course.fromJson(json['course'] as Map<String, dynamic>),
     );
 
-Map<String, dynamic> _$CourseEnrollmentToJson(CourseEnrollment instance) {
-  final val = <String, dynamic>{
-    'id': instance.id,
-    'student_id': instance.studentId,
-    'course_id': instance.courseId,
-    'enrolled_via': CourseEnrollment._methodToJson(instance.enrolledVia),
-    'status': CourseEnrollment._statusToJson(instance.status),
-    'enrolled_at': instance.enrolledAt?.toIso8601String(),
-  };
-
-  void writeNotNull(String key, dynamic value) {
-    if (value != null) {
-      val[key] = value;
-    }
-  }
-
-  writeNotNull('course_title', instance.courseTitle);
-  writeNotNull('course_description', instance.courseDescription);
-  return val;
-}
+Map<String, dynamic> _$CourseEnrollmentToJson(CourseEnrollment instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'student_id': instance.studentId,
+      'course_id': instance.courseId,
+      'enrolled_via': CourseEnrollment._methodToJson(instance.enrolledVia),
+      'status': CourseEnrollment._statusToJson(instance.status),
+      'enrolled_at': instance.enrolledAt?.toIso8601String(),
+      'course_title': ?instance.courseTitle,
+      'course_description': ?instance.courseDescription,
+    };

@@ -26,6 +26,9 @@ void main() async {
   final connectivityService = ConnectivityService();
   await connectivityService.initialize();
 
+  // Initialize offline sync (Must be after Supabase init)
+  await OfflineSyncService.instance.initialize();
+
   // Set up BLoC observer for debugging
   Bloc.observer = AlsBlocObserver();
 

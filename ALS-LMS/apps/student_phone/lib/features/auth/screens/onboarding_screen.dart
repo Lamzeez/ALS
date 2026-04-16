@@ -276,13 +276,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     context.read<AuthBloc>().add(
           AuthSetRoleRequested(
             role: _selectedRole,
-            lrn: _lrnController.text.trim().isNotEmpty
+            studentIdNumber: _lrnController.text.trim().isNotEmpty
                 ? _lrnController.text.trim()
                 : null,
             empId: _empIdController.text.trim().isNotEmpty
                 ? _empIdController.text.trim()
                 : null,
-            districtId: _centerController.text.trim().isNotEmpty
+            alsCenterId: _centerController.text.trim().isNotEmpty
                 ? _centerController.text.trim()
                 : null,
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart'; // Required for context.push
 import 'package:shared_ui/shared_ui.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -340,7 +341,7 @@ class _LoginScreenState extends State<LoginScreen>
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/register'),
+                  onPressed: () => context.push('/register'), // FIXED: Use go_router
                   child: Text(
                     'Sign Up',
                     style: TextStyle(

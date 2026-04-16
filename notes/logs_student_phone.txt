@@ -1,0 +1,76 @@
+Launching lib\main.dart on Chrome in debug mode...
+lib/features/student/dashboard/screens/dashboard_screen.dart:131:45: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                  backgroundImage: profile?.avatarUrl != null
+                                            ^^^^^^^^^
+lib/features/student/dashboard/screens/dashboard_screen.dart:132:47: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                      ? NetworkImage(profile!.avatarUrl!)
+                                              ^^^^^^^^^
+lib/features/student/dashboard/screens/dashboard_screen.dart:134:35: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                  child: profile?.avatarUrl == null
+                                  ^^^^^^^^^
+lib/features/student/dashboard/screens/dashboard_screen.dart:864:49: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                      backgroundImage: profile?.avatarUrl != null
+                                                ^^^^^^^^^
+lib/features/student/dashboard/screens/dashboard_screen.dart:865:51: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                          ? NetworkImage(profile!.avatarUrl!)
+                                                  ^^^^^^^^^
+lib/features/student/dashboard/screens/dashboard_screen.dart:867:39: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                      child: profile?.avatarUrl == null
+                                      ^^^^^^^^^
+lib/features/student/dashboard/screens/dashboard_screen.dart:911:26: Error: The getter 'lrn' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
+            if (profile?.lrn != null) ...[
+                         ^^^
+lib/features/student/dashboard/screens/dashboard_screen.dart:915:48: Error: The getter 'lrn' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
+                  label: Text('LRN: ${profile!.lrn}'),
+                                               ^^^
+lib/features/teacher/screens/teacher_dashboard_screen.dart:307:43: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                backgroundImage: profile?.avatarUrl != null
+                                          ^^^^^^^^^
+lib/features/teacher/screens/teacher_dashboard_screen.dart:308:45: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                    ? NetworkImage(profile!.avatarUrl!)
+                                            ^^^^^^^^^
+lib/features/teacher/screens/teacher_dashboard_screen.dart:310:33: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+                child: profile?.avatarUrl == null
+                                ^^^^^^^^^
+lib/features/teacher/screens/teacher_dashboard_screen.dart:690:49: Error: The getter 'lrn' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
+                            final lrn = profile.lrn;
+                                                ^^^
+lib/features/student/dashboard/screens/settings_screen.dart:35:44: Error: The getter 'lrn' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
+      _lrnController.text = state.profile!.lrn ?? '';
+                                           ^^^
+lib/features/student/dashboard/screens/settings_screen.dart:179:53: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
+ - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
+        state is AuthAuthenticated ? state.profile?.avatarUrl : null;
+                                                    ^^^^^^^^^
+lib/features/student/dashboard/screens/settings_screen.dart:287:9: Error: No named parameter with the name 'lrn'.
+        lrn: _lrnController.text.trim().isNotEmpty
+        ^^^
+Waiting for connection from debug service on Chrome...             21.9s
+Failed to compile application.

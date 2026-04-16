@@ -54,8 +54,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthUnauthenticated());
       }
     } catch (e) {
-      if (_authService.currentSession != null) {
-        emit(AuthAuthenticated());
+      if (_authService.isLoggedIn) {
+        // Fallback to skeleton if DB profile fetch fails but session is valid
+        emit(_resolveProfileState(null));
       } else {
         emit(AuthUnauthenticated());
       }
@@ -69,12 +70,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (user != null) {
         // Fresh sign-in, no profile yet. Auto-create skeleton for onboarding screen.
         final metadata = user.userMetadata ?? {};
+        
+        // Try to get role from metadata if it was set during sign-up
+        UserRole? metaRole;
+        final roleStr = metadata['role'] ?? metadata['user_role'];
+        if (roleStr != null) {
+          metaRole = UserRole.fromJson(roleStr.toString());
+        }
+
+        final bool isDone = metadata['onboarding_completed'] == true || 
+                           metadata['onboarding_completed'] == 'true';
+
+        if (isDone && profile == null) {
+           // If metadata says we are done, but DB is slow, return Authenticated with a skeleton
+           return AuthAuthenticated(
+            profile: Profile(
+              id: user.id,
+              fullName: metadata['full_name'] ?? metadata['name'] ?? 'User',
+              email: user.email,
+              role: preferredRole ?? metaRole ?? UserRole.student,
+              onboardingCompleted: true,
+            ),
+          );
+        }
+
         return AuthNeedsOnboarding(
           profile: Profile(
             id: user.id,
             fullName: metadata['full_name'] ?? metadata['name'] ?? 'User',
             email: user.email,
-            role: preferredRole ?? UserRole.student,
+            role: preferredRole ?? metaRole ?? UserRole.student,
             onboardingCompleted: false,
             approvalStatus: ApprovalStatus.approved,
           ),
@@ -164,9 +189,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _authService.signUpWithEmail(
         email: event.email,
         password: event.password,
-        fullName: event.fullName,
+        firstName: event.firstName,
+        lastName: event.lastName,
       );
-      emit(AuthSignUpSuccess());
+      // Instead of AuthSignUpSuccess, we reload profile to trigger redirect
+      final profile = await _authService.getCurrentProfile();
+      emit(_resolveProfileState(profile));
     } catch (e) {
       emit(AuthError(message: _formatError(e)));
     }
@@ -181,7 +209,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _authService.signUpWithEmail(
         email: event.email,
         password: event.password,
-        fullName: event.fullName,
+        firstName: event.firstName,
+        lastName: event.lastName,
         role: event.role,
         studentId: event.studentId,
         empId: event.empId,
@@ -191,7 +220,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         lastYearAttended: event.lastYearAttended,
         centerLocation: event.centerLocation,
       );
-      emit(AuthSignUpSuccess());
+      // Instead of AuthSignUpSuccess, we reload profile to trigger redirect
+      final profile = await _authService.getCurrentProfile();
+      emit(_resolveProfileState(profile));
     } catch (e) {
       emit(AuthError(message: _formatError(e)));
     }
@@ -205,9 +236,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await _authService.setUserRole(
         role: event.role,
-        lrn: event.lrn,
+        studentIdNumber: event.studentIdNumber,
         empId: event.empId,
-        districtId: event.districtId,
+        alsCenterId: event.alsCenterId,
       );
       final profile = await _authService.getCurrentProfile();
       emit(_resolveProfileState(profile));

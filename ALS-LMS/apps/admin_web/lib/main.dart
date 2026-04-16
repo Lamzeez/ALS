@@ -4,6 +4,7 @@ import 'package:shared_ui/shared_ui.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,20 +26,60 @@ class AlsAdminApp extends StatelessWidget {
       theme: AlsTheme.lightTheme,
       darkTheme: AlsTheme.darkTheme,
       debugShowCheckedModeBanner: false,
-      home: const AdminDashboard(),
+      home: const AdminAuthGate(),
     );
   }
 }
 
+class AdminAuthGate extends StatefulWidget {
+  const AdminAuthGate({super.key});
+
+  @override
+  State<AdminAuthGate> createState() => _AdminAuthGateState();
+}
+
+class _AdminAuthGateState extends State<AdminAuthGate> {
+  Profile? _profile;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final profile = await AuthService().getCurrentProfile();
+    if (mounted) {
+      setState(() {
+        _profile = profile;
+        _checking = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    
+    if (_profile == null) {
+      return WebLoginScreen(onLoginSuccess: (p) => setState(() => _profile = p));
+    }
+
+    return AdminDashboard(adminProfile: _profile!);
+  }
+}
+
 class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({super.key});
+  final Profile adminProfile;
+  const AdminDashboard({super.key, required this.adminProfile});
 
   @override
   State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  UserRole currentView = UserRole.devAdmin;
+  late UserRole currentView;
   int _selectedNavIndex = 0;
 
   // Services
@@ -71,6 +112,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
+    currentView = widget.adminProfile.role;
     _loadData();
   }
 
@@ -1493,7 +1535,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _buildDataTable(
           ['Table', 'Description'],
           [
-            ['profiles', 'User profiles (students, teachers, admins)'],
+            ['users', 'User profiles (students, teachers, admins)'],
             ['districts', 'Regional districts'],
             ['cohorts', 'Barangay-level learning groups'],
             ['learning_centers', 'Physical/logical learning centers'],
@@ -2168,9 +2210,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         itemCount: teachers.length,
                         itemBuilder: (context, index) {
                           final t = teachers[index];
-                          final profile =
-                              t['profiles'] as Map<String, dynamic>?;
-                          return ListTile(
+                          final profile = t; // Each row is already a user map from getCenterTeachers()                          return ListTile(
                             leading: const CircleAvatar(
                               child: Icon(Icons.person),
                             ),
@@ -2359,7 +2399,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
             const SizedBox(width: 16),
             _buildBucketInfoCard(
-              'Profile Avatars',
+              'Profile Pictures',
               'User profile images and identity assets.',
               Icons.account_circle_rounded,
               AlsColors.secondary,

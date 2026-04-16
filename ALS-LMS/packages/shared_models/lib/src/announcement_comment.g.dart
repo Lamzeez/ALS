@@ -20,22 +20,13 @@ AnnouncementComment _$AnnouncementCommentFromJson(Map<String, dynamic> json) =>
     );
 
 Map<String, dynamic> _$AnnouncementCommentToJson(
-    AnnouncementComment instance) {
-  final val = <String, dynamic>{
-    'id': instance.id,
-    'announcement_id': instance.announcementId,
-    'user_id': instance.userId,
-    'content': instance.content,
-    'created_at': instance.createdAt?.toIso8601String(),
-  };
-
-  void writeNotNull(String key, dynamic value) {
-    if (value != null) {
-      val[key] = value;
-    }
-  }
-
-  writeNotNull('user_name', instance.userName);
-  writeNotNull('user_avatar', instance.userAvatar);
-  return val;
-}
+  AnnouncementComment instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'announcement_id': instance.announcementId,
+  'user_id': instance.userId,
+  'content': instance.content,
+  'created_at': instance.createdAt?.toIso8601String(),
+  'user_name': ?instance.userName,
+  'user_avatar': ?instance.userAvatar,
+};

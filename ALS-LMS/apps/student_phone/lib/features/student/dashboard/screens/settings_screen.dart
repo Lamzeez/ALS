@@ -18,7 +18,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _nameController = TextEditingController();
-  final _lrnController = TextEditingController();
+  final _studentIdNumberController = TextEditingController();
   final _oldPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -32,14 +32,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final state = context.read<AuthBloc>().state;
     if (state is AuthAuthenticated && state.profile != null) {
       _nameController.text = state.profile!.fullName;
-      _lrnController.text = state.profile!.lrn ?? '';
+      _studentIdNumberController.text = state.profile!.studentIdNumber ?? '';
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _lrnController.dispose();
+    _studentIdNumberController.dispose();
     _oldPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
@@ -88,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _lrnController,
+                    controller: _studentIdNumberController,
                     decoration: const InputDecoration(
                       labelText: 'Student ID / LRN',
                       prefixIcon: Icon(Icons.badge_outlined),
@@ -175,16 +175,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildAvatarPicker() {
     final state = context.read<AuthBloc>().state;
-    final avatarUrl =
-        state is AuthAuthenticated ? state.profile?.avatarUrl : null;
+    final profilePictureUrl =
+        state is AuthAuthenticated ? state.profile?.profilePictureUrl : null;
     return Center(
       child: Stack(
         children: [
           CircleAvatar(
             radius: 52,
             backgroundColor: AlsColors.primarySurface,
-            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-            child: avatarUrl == null
+            backgroundImage: profilePictureUrl != null ? NetworkImage(profilePictureUrl) : null,
+            child: profilePictureUrl == null
                 ? Icon(Icons.person_rounded, size: 52, color: AlsColors.primary)
                 : null,
           ),
@@ -284,8 +284,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final authService = context.read<AuthService>();
       await authService.updateProfile(
         fullName: _nameController.text.trim(),
-        lrn: _lrnController.text.trim().isNotEmpty
-            ? _lrnController.text.trim()
+        studentIdNumber: _studentIdNumberController.text.trim().isNotEmpty
+            ? _studentIdNumberController.text.trim()
             : null,
       );
 

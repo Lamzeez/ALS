@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_services/src/supabase_client.dart';
@@ -8,11 +9,6 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 /// Service that manages synchronization between local SQLite and Supabase.
-/// Handles:
-/// - Detecting connectivity changes
-/// - Syncing local changes to the cloud
-/// - Downloading remote changes to local storage
-/// - Conflict resolution (last-write-wins)
 class OfflineSyncService {
   static OfflineSyncService? _instance;
   static OfflineSyncService get instance =>
@@ -29,303 +25,135 @@ class OfflineSyncService {
   bool _isSyncing = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
-  /// Get current online status
   bool get isOnline => _isOnline;
-
-  /// Get sync status
   bool get isSyncing => _isSyncing;
 
-  /// Initialize the sync service and start listening for connectivity changes
   Future<void> initialize() async {
     developer.log('Initializing OfflineSyncService', name: 'OfflineSync');
-
-    // Check initial connectivity
     final result = await _connectivity.checkConnectivity();
-    _isOnline = result.isNotEmpty &&
-        !result.contains(ConnectivityResult.none);
+    _isOnline = result.isNotEmpty && !result.contains(ConnectivityResult.none);
 
-    developer.log('Initial connectivity: ${_isOnline ? "online" : "offline"}',
-        name: 'OfflineSync');
-
-    // Listen for connectivity changes
     _connectivitySubscription =
         _connectivity.onConnectivityChanged.listen(_onConnectivityChanged);
 
-    // If online, sync now
     if (_isOnline) {
-      await syncToCloud();
+      syncToCloud();
     }
   }
 
-  /// Handle connectivity changes
-  Future<void> _onConnectivityChanged(
-      List<ConnectivityResult> results) async {
+  Future<void> _onConnectivityChanged(List<ConnectivityResult> results) async {
     final wasOnline = _isOnline;
     _isOnline = results.isNotEmpty && !results.contains(ConnectivityResult.none);
 
     if (_isOnline && !wasOnline) {
       developer.log('Connection restored, syncing...', name: 'OfflineSync');
-      await syncToCloud();
-    } else if (!_isOnline && wasOnline) {
-      developer.log('Connection lost, entering offline mode',
-          name: 'OfflineSync');
+      syncToCloud();
     }
   }
 
   /// Sync all pending local changes to Supabase
   Future<void> syncToCloud() async {
-    if (_isSyncing) {
-      developer.log('Sync already in progress, skipping', name: 'OfflineSync');
-      return;
-    }
-
-    if (!_isOnline) {
-      developer.log('Cannot sync: device is offline', name: 'OfflineSync');
-      return;
-    }
+    if (_isSyncing || !_isOnline) return;
 
     _isSyncing = true;
-    developer.log('Starting sync to cloud...', name: 'OfflineSync');
-
     try {
       final client = SupabaseConfig.client;
       final pendingOps = await _syncQueue.getPendingOperations();
 
-      developer.log('Found ${pendingOps.length} pending operations',
-          name: 'OfflineSync');
+      if (pendingOps.isEmpty) {
+        _isSyncing = false;
+        return;
+      }
+
+      developer.log('Syncing ${pendingOps.length} operations...', name: 'OfflineSync');
 
       for (final op in pendingOps) {
         try {
           await _executeOperation(client, op);
-          await _syncQueue.markAsCompleted(op['id'] as String);
+          await _syncQueue.markAsCompleted(op['id'].toString());
         } catch (e) {
-          developer.log('Failed to sync operation: $e', name: 'OfflineSync');
-          await _syncQueue.markAsFailed(op['id'] as String, e.toString());
+          developer.log('Operation failed: $e', name: 'OfflineSync');
+          await _syncQueue.markAsFailed(op['id'].toString(), e.toString());
         }
       }
 
-      // Clear completed operations
       await _syncQueue.clearCompleted();
-
-      developer.log('Sync to cloud completed', name: 'OfflineSync');
+      developer.log('Sync completed successfully', name: 'OfflineSync');
     } catch (e) {
-      developer.log('Sync failed: $e', name: 'OfflineSync');
-      rethrow;
+      developer.log('Sync loop failed: $e', name: 'OfflineSync');
     } finally {
       _isSyncing = false;
     }
   }
 
-  /// Download remote data to local storage
-  Future<void> downloadCourseData({
-    required String courseId,
-    required String studentId,
-  }) async {
-    if (!_isOnline) {
-      developer.log('Cannot download: device is offline', name: 'OfflineSync');
-      throw Exception('Device is offline');
-    }
-
-    developer.log('Downloading course data: $courseId', name: 'OfflineSync');
-
-    try {
-      final client = SupabaseConfig.client;
-
-      // Download lessons
-      final lessons = await client
-          .from('lessons')
-          .select()
-          .eq('course_id', courseId)
-          .eq('is_published', true);
-
-      // Download quizzes for each lesson
-      final quizzes = <Map<String, dynamic>>[];
-      final questions = <Map<String, dynamic>>[];
-
-      for (final lesson in lessons) {
-        final lessonQuizzes = await client
-            .from('quizzes')
-            .select()
-            .eq('lesson_id', lesson['id'])
-            .eq('is_published', true);
-
-        quizzes.addAll(lessonQuizzes);
-
-        for (final quiz in lessonQuizzes) {
-          final quizQuestions = await client
-              .from('questions')
-              .select()
-              .eq('quiz_id', quiz['id'])
-              .order('order_index', ascending: true);
-
-          questions.addAll(quizQuestions);
-        }
-      }
-
-      // Save to local storage
-      // Note: These would use the repositories, but keeping it simple for now
-      developer.log(
-          'Downloaded ${lessons.length} lessons, ${quizzes.length} quizzes, ${questions.length} questions',
-          name: 'OfflineSync');
-    } catch (e) {
-      developer.log('Download failed: $e', name: 'OfflineSync');
-      rethrow;
-    }
-  }
-
-  /// Track lesson progress locally (will sync when online)
-  Future<void> trackProgress({
-    required String studentId,
-    required String lessonId,
-    required double progressPercent,
-    int timeSpentMinutes = 0,
-    bool isCompleted = false,
-  }) async {
-    developer.log('Tracking progress: $lessonId ($progressPercent%)',
-        name: 'OfflineSync');
-
-    // Save to local storage
-    await _progress.upsertProgress({
-      'id': '${studentId}_$lessonId',
-      'student_id': studentId,
-      'lesson_id': lessonId,
-      'progress_percent': progressPercent,
-      'time_spent_minutes': timeSpentMinutes,
-      'is_completed': isCompleted ? 1 : 0,
-      'last_accessed_at': DateTime.now().toIso8601String(),
-      if (isCompleted) 'completed_at': DateTime.now().toIso8601String(),
-    });
-
-    // If online, also sync to Supabase
-    if (_isOnline) {
-      try {
-        final client = SupabaseConfig.client;
-        await client.from('progress').upsert({
-          'student_id': studentId,
-          'lesson_id': lessonId,
-          'progress_percent': progressPercent,
-          'time_spent_minutes': timeSpentMinutes,
-          'is_completed': isCompleted,
-        }, onConflict: 'student_id,lesson_id');
-      } catch (e) {
-        // If sync fails, the data is still saved locally
-        developer.log('Failed to sync progress to cloud: $e',
-            name: 'OfflineSync');
-
-        // Add to sync queue for later
-        await _syncQueue.addToQueue(
-          studentId: studentId,
-          operationType: 'upsert',
-          tableName: 'progress',
-          payload: {
-            'student_id': studentId,
-            'lesson_id': lessonId,
-            'progress_percent': progressPercent,
-            'time_spent_minutes': timeSpentMinutes,
-            'is_completed': isCompleted,
-          },
-        );
-      }
+  /// The "Core Pipe": Translates local queue items into Supabase commands
+  Future<void> _executeOperation(SupabaseClient client, Map<String, dynamic> op) async {
+    final String type = op['operation_type'];
+    final String table = op['table_name'];
+    final dynamic rawPayload = op['payload'];
+    
+    // Handle payload if it's stored as a JSON string in SQLite
+    Map<String, dynamic> payload;
+    if (rawPayload is String) {
+      payload = jsonDecode(rawPayload);
     } else {
-      // Add to sync queue for later
-      await _syncQueue.addToQueue(
-        studentId: studentId,
-        operationType: 'upsert',
-        tableName: 'progress',
-        payload: {
-          'student_id': studentId,
-          'lesson_id': lessonId,
-          'progress_percent': progressPercent,
-          'time_spent_minutes': timeSpentMinutes,
-          'is_completed': isCompleted,
-        },
-      );
+      payload = Map<String, dynamic>.from(rawPayload);
+    }
+
+    developer.log('Cloud Sync: $type on $table', name: 'OfflineSync');
+
+    switch (table) {
+      case 'progress':
+      case 'module_progress':
+        // Progress uses student_id and module_id as composite key
+        await client.from(table).upsert(payload, onConflict: 'student_id,module_id');
+        break;
+      case 'scores':
+        // Scores are usually single-insert entries
+        await client.from(table).insert(payload);
+        break;
+      default:
+        // Generic fallback for other tables
+        if (type == 'upsert') {
+          await client.from(table).upsert(payload);
+        } else if (type == 'insert') {
+          await client.from(table).insert(payload);
+        }
     }
   }
 
-  /// Submit quiz score locally (will sync when online)
-  Future<void> submitScore({
+  /// Manually track progress (Offline-First)
+  Future<void> trackModuleProgress({
     required String studentId,
-    required String quizId,
-    required int score,
-    required int totalQuestions,
-    Map<String, dynamic>? answers,
+    required String moduleId,
+    required String courseId,
+    required String status,
+    double masteryScore = 0,
   }) async {
-    developer.log('Submitting score: $score/$totalQuestions',
-        name: 'OfflineSync');
-
-    final scoreData = {
-      'id': '${studentId}_${quizId}_${DateTime.now().millisecondsSinceEpoch}',
+    final data = {
       'student_id': studentId,
-      'quiz_id': quizId,
-      'score': score,
-      'total_questions': totalQuestions,
-      'completed_at': DateTime.now().toIso8601String(),
-      if (answers != null) 'answers_json': answers.toString(),
+      'module_id': moduleId,
+      'course_id': courseId,
+      'status': status,
+      'mastery_score': masteryScore,
+      'updated_at': DateTime.now().toIso8601String(),
     };
 
-    // Save to local storage
-    await _scores.insertScore(scoreData);
+    // 1. Save to Local SQLite immediately
+    await _progress.upsertProgress(data);
 
-    // If online, also sync to Supabase
-    if (_isOnline) {
-      try {
-        final client = SupabaseConfig.client;
-        await client.from('scores').insert({
-          'student_id': studentId,
-          'quiz_id': quizId,
-          'score': score,
-          'total_questions': totalQuestions,
-        });
-      } catch (e) {
-        developer.log('Failed to sync score to cloud: $e',
-            name: 'OfflineSync');
+    // 2. Add to Sync Queue
+    await _syncQueue.addToQueue(
+      studentId: studentId,
+      operationType: 'upsert',
+      tableName: 'module_progress',
+      payload: data,
+    );
 
-        // Add to sync queue for later
-        await _syncQueue.addToQueue(
-          studentId: studentId,
-          operationType: 'insert',
-          tableName: 'scores',
-          payload: scoreData,
-        );
-      }
-    } else {
-      // Add to sync queue for later
-      await _syncQueue.addToQueue(
-        studentId: studentId,
-        operationType: 'insert',
-        tableName: 'scores',
-        payload: scoreData,
-      );
-    }
+    // 3. Trigger background sync if online
+    if (_isOnline) syncToCloud();
   }
 
-  /// Execute a sync operation
-  Future<void> _executeOperation(
-      SupabaseClient client, Map<String, dynamic> op) async {
-    final operationType = op['operation_type'] as String;
-    final tableName = op['table_name'] as String;
-    // final payload = op['payload'] as String; // Reserved for future implementation
-
-    developer.log('Executing $operationType on $tableName', name: 'OfflineSync');
-
-    switch (operationType) {
-      case 'upsert':
-        // Upsert logic here
-        break;
-      case 'insert':
-        // Insert logic here
-        break;
-      case 'update':
-        // Update logic here
-        break;
-      case 'delete':
-        // Delete logic here
-        break;
-    }
-  }
-
-  /// Dispose resources
   Future<void> dispose() async {
     await _connectivitySubscription?.cancel();
   }

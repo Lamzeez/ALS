@@ -2,18 +2,22 @@ import 'package:shared_models/shared_models.dart';
 import 'supabase_client.dart';
 
 class CenterService {
+  /// 🏛️ Get list of all active ALS Learning Centers
   Future<List<LearningCenter>> getCenters() async {
-    try {
-      final rows = await SupabaseConfig.client
-          .from('learning_centers')
-          .select()
-          .order('name');
-      return (rows as List)
-          .map((r) => LearningCenter.fromJson(r as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
-    }
+    return SupabaseConfig.withRetry(
+      () async {
+        final rows = await SupabaseConfig.client
+            .from('learning_centers')
+            .select()
+            .eq('is_active', true)
+            .order('name');
+            
+        return (rows as List)
+            .map((r) => LearningCenter.fromJson(r as Map<String, dynamic>))
+            .toList();
+      },
+      operationName: 'getCenters',
+    );
   }
 
   Future<void> createCenter({
@@ -30,31 +34,43 @@ class CenterService {
     });
   }
 
+  Future<void> deleteCenter(String id) async {
+    await SupabaseConfig.client
+        .from('learning_centers')
+        .update({'is_active': false})
+        .eq('id', id);
+  }
+
   Future<List<Map<String, dynamic>>> getCenterTeachers(String centerId) async {
     try {
       final rows = await SupabaseConfig.client
-          .from('center_teachers')
-          .select('*, profiles(*)')
-          .eq('center_id', centerId)
-          .eq('is_active', true);
+          .from('profiles')
+          .select()
+          .eq('als_center_id', centerId)
+          .eq('role', 'teacher');
       return (rows as List).cast<Map<String, dynamic>>();
     } catch (_) {
       return [];
     }
   }
 
+  Future<List<Profile>> getAvailableTeachers() async {
+    final rows = await SupabaseConfig.client
+        .from('profiles')
+        .select()
+        .eq('role', 'teacher')
+        .eq('is_active', true);
+    return (rows as List).map((r) => Profile.fromJson(r)).toList();
+  }
+
   Future<void> assignTeacher({
     required String centerId,
     required String teacherId,
   }) async {
-    await SupabaseConfig.client.from('center_teachers').upsert(
-      {
-        'center_id': centerId,
-        'teacher_id': teacherId,
-        'is_active': true,
-      },
-      onConflict: 'center_id,teacher_id',
-    );
+    await SupabaseConfig.client
+        .from('profiles')
+        .update({'als_center_id': centerId})
+        .eq('id', teacherId);
   }
 
   Future<void> removeTeacher({
@@ -62,31 +78,8 @@ class CenterService {
     required String teacherId,
   }) async {
     await SupabaseConfig.client
-        .from('center_teachers')
-        .update({'is_active': false})
-        .eq('center_id', centerId)
-        .eq('teacher_id', teacherId);
-  }
-
-  Future<List<Profile>> getAvailableTeachers() async {
-    try {
-      final rows = await SupabaseConfig.client
-          .from('profiles')
-          .select()
-          .eq('role', 'teacher')
-          .eq('is_active', true)
-          .order('full_name');
-      return (rows as List)
-          .map((r) => Profile.fromJson(r as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<void> deleteCenter(String id) async {
-    await SupabaseConfig.client
-        .from('learning_centers')
-        .update({'is_active': false}).eq('id', id);
+        .from('profiles')
+        .update({'als_center_id': null})
+        .eq('id', teacherId);
   }
 }

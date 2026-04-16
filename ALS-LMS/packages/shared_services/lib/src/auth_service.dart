@@ -30,6 +30,7 @@ class AuthService {
           );
         }
 
+        // Table is 'profiles' in Supabase
         final data =
             await _client.from('profiles').select('*').eq('id', uid).maybeSingle();
 
@@ -127,7 +128,8 @@ class AuthService {
   Future<void> signUpWithEmail({
     required String email,
     required String password,
-    required String fullName,
+    required String firstName,
+    required String lastName,
     Object? role,
     String? studentId,
     String? empId,
@@ -137,42 +139,64 @@ class AuthService {
     String? lastYearAttended,
     String? centerLocation,
   }) async {
+    final roleStr = role is UserRole
+        ? role.toJson()
+        : (role?.toString() ?? UserRole.student.toJson());
+
+    // CRITICAL: Pass all data in metadata so the DB trigger can populate public.profiles
     final response = await _client.auth.signUp(
       email: email,
       password: password,
-      data: {'full_name': fullName},
-    );
-    final uid = response.user?.id;
-    if (uid != null) {
-      final roleStr = role is UserRole
-          ? role.toJson()
-          : (role?.toString() ?? UserRole.student.toJson());
-      // Teachers start as pending; everyone else is approved.
-      final approvalStatus =
-          roleStr == UserRole.teacher.toJson() ? 'pending' : 'approved';
-      // Use upsert so the profile row is created if the DB trigger hasn't run yet.
-      await _client.from('profiles').upsert({
-        'id': uid,
-        'full_name': fullName,
-        'email': email,
+      data: {
+        'first_name': firstName,
+        'last_name': lastName,
+        'full_name': '$firstName $lastName',
         'role': roleStr,
-        'approval_status': approvalStatus,
+        'student_id_number': studentId,
+        'employee_id': empId,
+        'gender': gender,
+        'date_of_birth': birthDate,
+        'last_school_attended': lastSchool,
+        'last_year_attended': lastYearAttended,
+        'als_center_id': centerLocation,
         'onboarding_completed': true,
-        if (studentId != null && studentId.isNotEmpty) 'lrn': studentId,
-        if (empId != null && empId.isNotEmpty) 'employee_id': empId,
-        if (centerLocation != null && centerLocation.isNotEmpty)
-          'district_id': centerLocation,
-      }, onConflict: 'id');
+      },
+    );
+    
+    final user = response.user;
+    if (user != null) {
+      // Manually insert into students or teachers table just in case the trigger has a delay
+      // Profiles table is handled by trigger (no insert policy for app), 
+      // but students/teachers have own_insert policies.
+      try {
+        if (roleStr == 'student') {
+          await _client.from('students').upsert({
+            'user_id': user.id,
+            'student_id_number': studentId,
+            'als_center_id': centerLocation,
+            'date_of_birth': birthDate,
+          });
+        } else if (roleStr == 'teacher') {
+          await _client.from('teachers').upsert({
+            'user_id': user.id,
+            'employee_id': empId,
+            'als_center_id': centerLocation,
+          });
+        }
+      } catch (e) {
+        // Log error but don't fail signUp if manual insert fails (trigger might still work)
+        developer.log('Manual role-table insert failed (might be handled by trigger): $e', name: 'AuthService');
+      }
     }
   }
 
   /// Called after Google Sign-In to finish onboarding.
-  /// Sets role, approval_status, optional LRN, and marks onboarding done.
+  /// Sets role, approval_status, optional IDs, and marks onboarding done.
   Future<void> setUserRole({
     required UserRole role,
-    String? lrn,
+    String? studentIdNumber,
     String? empId,
-    String? districtId,
+    String? alsCenterId,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) return;
@@ -181,6 +205,7 @@ class AuthService {
     final metadata = user.userMetadata ?? {};
     final approvalStatus = role == UserRole.teacher ? 'pending' : 'approved';
 
+    // Table is 'profiles', columns are snake_case to match migrations
     await _client.from('profiles').upsert({
       'id': uid,
       'full_name': metadata['full_name'] ?? metadata['name'] ?? 'User',
@@ -188,10 +213,10 @@ class AuthService {
       'role': role.toJson(),
       'approval_status': approvalStatus,
       'onboarding_completed': true,
-      if (lrn != null && lrn.isNotEmpty) 'lrn': lrn,
+      if (studentIdNumber != null && studentIdNumber.isNotEmpty) 'student_id_number': studentIdNumber,
       if (empId != null && empId.isNotEmpty) 'employee_id': empId,
-      if (districtId != null && districtId.isNotEmpty)
-        'district_id': districtId,
+      if (alsCenterId != null && alsCenterId.isNotEmpty)
+        'als_center_id': alsCenterId,
     }, onConflict: 'id');
   }
 
@@ -202,7 +227,8 @@ class AuthService {
     required String mimeType,
   }) async {
     final path = '$uid/avatar.jpg';
-    await _client.storage.from('profile-avatars').uploadBinary(
+    // Bucket is 'profile-pictures' as per migrations
+    await _client.storage.from('profile-pictures').uploadBinary(
           path,
           fileBytes as Uint8List,
           fileOptions: supa.FileOptions(
@@ -210,8 +236,8 @@ class AuthService {
             upsert: true,
           ),
         );
-    final url = _client.storage.from('profile-avatars').getPublicUrl(path);
-    await _client.from('profiles').update({'avatar_url': url}).eq('id', uid);
+    final url = _client.storage.from('profile-pictures').getPublicUrl(path);
+    await _client.from('profiles').update({'profile_picture_url': url}).eq('id', uid);
     return url;
   }
 
@@ -232,7 +258,7 @@ class AuthService {
   }
 
   /// 📝 Update user profile with validation
-  Future<void> updateProfile({required String fullName, String? lrn}) async {
+  Future<void> updateProfile({required String fullName, String? studentIdNumber}) async {
     await SupabaseConfig.withRetry(
       () async {
         final uid = _client.auth.currentUser?.id;
@@ -253,8 +279,8 @@ class AuthService {
           'updated_at': DateTime.now().toIso8601String(),
         };
 
-        if (lrn != null && lrn.trim().isNotEmpty) {
-          updateData['lrn'] = lrn.trim();
+        if (studentIdNumber != null && studentIdNumber.trim().isNotEmpty) {
+          updateData['student_id_number'] = studentIdNumber.trim();
         }
 
         await _client.from('profiles').update(updateData).eq('id', uid);

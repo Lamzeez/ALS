@@ -9,44 +9,66 @@ class Profile extends Equatable {
   final String id;
   @JsonKey(fromJson: UserRole.fromJson, toJson: _roleToJson)
   final UserRole role;
-  final String? lrn;
+  
+  @JsonKey(name: 'student_id_number')
+  final String? studentIdNumber;
+  
   @JsonKey(name: 'full_name')
   final String fullName;
+  
+  @JsonKey(name: 'first_name')
+  final String? firstName;
+  
+  @JsonKey(name: 'last_name')
+  final String? lastName;
+
   final String? email;
-  @JsonKey(name: 'district_id')
-  final String? districtId;
-  @JsonKey(name: 'avatar_url')
-  final String? avatarUrl;
+  
+  @JsonKey(name: 'als_center_id')
+  final String? alsCenterId;
+  
+  @JsonKey(name: 'profile_picture_url')
+  final String? profilePictureUrl;
+  
   @JsonKey(name: 'device_id')
   final String? deviceId;
+  
   @JsonKey(name: 'phone_number')
   final String? phoneNumber;
+  
   @JsonKey(name: 'is_active')
   final bool isActive;
+  
   @JsonKey(name: 'approval_status', fromJson: ApprovalStatus.fromJson)
   final ApprovalStatus approvalStatus;
+  
   @JsonKey(name: 'onboarding_completed')
   final bool onboardingCompleted;
+  
   @JsonKey(name: 'employee_id')
   final String? employeeId;
+  
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
+  
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
 
   const Profile({
     required this.id,
     required this.role,
-    this.lrn,
+    this.studentIdNumber,
     required this.fullName,
+    this.firstName,
+    this.lastName,
     this.email,
-    this.districtId,
-    this.avatarUrl,
+    this.alsCenterId,
+    this.profilePictureUrl,
     this.deviceId,
     this.phoneNumber,
     this.isActive = true,
     this.approvalStatus = ApprovalStatus.approved,
-    this.onboardingCompleted = true,
+    this.onboardingCompleted = false,
     this.employeeId,
     this.createdAt,
     this.updatedAt,
@@ -59,19 +81,21 @@ class Profile extends Equatable {
   static String _roleToJson(UserRole role) => role.toJson();
 
   static const String createTableSQL = '''
-    CREATE TABLE IF NOT EXISTS profiles (
+    CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       role TEXT NOT NULL DEFAULT 'student',
-      lrn TEXT UNIQUE,
+      student_id_number TEXT UNIQUE,
       full_name TEXT NOT NULL,
+      first_name TEXT,
+      last_name TEXT,
       email TEXT,
-      district_id TEXT,
-      avatar_url TEXT,
+      als_center_id TEXT,
+      profile_picture_url TEXT,
       device_id TEXT,
       phone_number TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       approval_status TEXT NOT NULL DEFAULT 'approved',
-      onboarding_completed INTEGER NOT NULL DEFAULT 1,
+      onboarding_completed INTEGER NOT NULL DEFAULT 0,
       employee_id TEXT,
       created_at TEXT,
       updated_at TEXT
@@ -81,11 +105,13 @@ class Profile extends Equatable {
   Map<String, dynamic> toSqlite() => {
         'id': id,
         'role': role.toJson(),
-        'lrn': lrn,
+        'student_id_number': studentIdNumber,
         'full_name': fullName,
+        'first_name': firstName,
+        'last_name': lastName,
         'email': email,
-        'district_id': districtId,
-        'avatar_url': avatarUrl,
+        'als_center_id': alsCenterId,
+        'profile_picture_url': profilePictureUrl,
         'device_id': deviceId,
         'phone_number': phoneNumber,
         'is_active': isActive ? 1 : 0,
@@ -99,11 +125,13 @@ class Profile extends Equatable {
   factory Profile.fromSqlite(Map<String, dynamic> map) => Profile(
         id: map['id'] as String,
         role: UserRole.fromJson(map['role'] as String),
-        lrn: map['lrn'] as String?,
+        studentIdNumber: map['student_id_number'] as String?,
         fullName: map['full_name'] as String,
+        firstName: map['first_name'] as String?,
+        lastName: map['last_name'] as String?,
         email: map['email'] as String?,
-        districtId: map['district_id'] as String?,
-        avatarUrl: map['avatar_url'] as String?,
+        alsCenterId: map['als_center_id'] as String?,
+        profilePictureUrl: map['profile_picture_url'] as String?,
         deviceId: map['device_id'] as String?,
         phoneNumber: map['phone_number'] as String?,
         isActive: (map['is_active'] as int?) == 1,

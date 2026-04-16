@@ -1,0 +1,49 @@
+PS D:\Documents\Studies\SY_2025-2026\SEM2\EmergingTech\ALS-Bondave\emerging-tech-Als-LMS\ALS-LMS\apps\admin_web> flutter run -d chrome
+Launching lib\main.dart on Chrome in debug mode...
+lib/main.dart:2229:54: Error: The method 'removeTeacher' isn't defined for the type 'CenterService'.
+ - 'CenterService' is from 'package:shared_services/src/center_service.dart' ('../../packages/shared_services/lib/src/center_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'removeTeacher'.
+                                await _centerService.removeTeacher(
+                                                     ^^^^^^^^^^^^^
+lib/main.dart:2265:36: Error: The method 'getAvailableTeachers' isn't defined for the type 'CenterService'.
+ - 'CenterService' is from 'package:shared_services/src/center_service.dart' ('../../packages/shared_services/lib/src/center_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'getAvailableTeachers'.
+            future: _centerService.getAvailableTeachers(),
+                                   ^^^^^^^^^^^^^^^^^^^^
+lib/main.dart:2284:46: Error: The method 'assignTeacher' isn't defined for the type 'CenterService'.
+ - 'CenterService' is from 'package:shared_services/src/center_service.dart' ('../../packages/shared_services/lib/src/center_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'assignTeacher'.
+                        await _centerService.assignTeacher(
+                                             ^^^^^^^^^^^^^
+lib/main.dart:2340:30: Error: The method 'deleteCenter' isn't defined for the type 'CenterService'.
+ - 'CenterService' is from 'package:shared_services/src/center_service.dart' ('../../packages/shared_services/lib/src/center_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'deleteCenter'.
+        await _centerService.deleteCenter(center.id);
+                             ^^^^^^^^^^^^
+lib/main.dart:2826:21: Error: No named parameter with the name 'teacherId'.
+                    teacherId: selectedTeacherId!,
+                    ^^^^^^^^^
+lib/main.dart:2894:43: Error: The method 'createModule' isn't defined for the type 'CourseService'.
+ - 'CourseService' is from 'package:shared_services/src/course_service.dart' ('../../packages/shared_services/lib/src/course_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'createModule'.
+                await _courseServiceAdmin.createModule(
+                                          ^^^^^^^^^^^^
+lib/main.dart:2987:45: Error: The method 'createLesson' isn't defined for the type 'CourseService'.
+ - 'CourseService' is from 'package:shared_services/src/course_service.dart' ('../../packages/shared_services/lib/src/course_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'createLesson'.
+                  await _courseServiceAdmin.createLesson(
+                                            ^^^^^^^^^^^^
+../../packages/shared_services/lib/src/course_service.dart:33:31: Error: The argument type 'String?' can't be assigned to the parameter type 'Object'.
+ - 'Object' is from 'dart:core'.
+            .eq('teacher_id', uid)
+                              ^
+../../packages/shared_services/lib/src/course_service.dart:105:112: Error: The argument type 'String?' can't be assigned to the parameter type 'Object'.
+ - 'Object' is from 'dart:core'.
+    final rows = await SupabaseConfig.client.from('scores').select('*').eq('quiz_id', quizId).eq('student_id', uid);
+                                                                                                               ^
+../../packages/shared_services/lib/src/course_service.dart:157:99: Error: The argument type 'String?' can't be assigned to the parameter type 'Object'.
+ - 'Object' is from 'dart:core'.
+    final rows = await SupabaseConfig.client.from('module_progress').select('*').eq('student_id', uid).eq('course_id', courseId);
+                                                                                                  ^
+Waiting for connection from debug service on Chrome...             16.8s
+Failed to compile application.

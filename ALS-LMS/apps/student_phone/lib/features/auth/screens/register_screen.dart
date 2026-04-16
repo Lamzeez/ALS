@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_ui/shared_ui.dart';
 import 'package:shared_models/shared_models.dart';
+import 'package:shared_services/shared_services.dart';
 import '../bloc/auth_bloc.dart';
 
 /// Registration screen with role selection and role-specific form fields.
@@ -21,14 +22,15 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // Student fields
+  // Role specific
   final _studentIdController = TextEditingController();
-  final _lastSchoolController = TextEditingController();
-  final _lastYearController = TextEditingController();
-
-  // Teacher fields
   final _empIdController = TextEditingController();
-  final _centerLocationController = TextEditingController();
+
+  // Center Selection
+  final _centerService = CenterService();
+  List<LearningCenter> _centers = [];
+  LearningCenter? _selectedCenter;
+  bool _isLoadingCenters = true;
 
   final _formKey = GlobalKey<FormState>();
   UserRole _selectedRole = UserRole.student;
@@ -60,6 +62,21 @@ class _RegisterScreenState extends State<RegisterScreen>
       curve: Curves.easeOutCubic,
     ));
     _animationController.forward();
+    _loadCenters();
+  }
+
+  Future<void> _loadCenters() async {
+    try {
+      final centers = await _centerService.getCenters();
+      if (mounted) {
+        setState(() {
+          _centers = centers;
+          _isLoadingCenters = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingCenters = false);
+    }
   }
 
   @override
@@ -70,10 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _studentIdController.dispose();
-    _lastSchoolController.dispose();
-    _lastYearController.dispose();
     _empIdController.dispose();
-    _centerLocationController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -98,7 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: const Text(
-                    'Account created! Please check your email to verify.'),
+                    'Account created! Redirecting...'),
                 backgroundColor: AlsColors.success,
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(
@@ -107,7 +121,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 duration: const Duration(seconds: 5),
               ),
             );
-            Navigator.pop(context);
+            // Navigator.pop(context) removed to allow automatic router redirect
           }
         },
         child: Container(
@@ -236,16 +250,25 @@ class _RegisterScreenState extends State<RegisterScreen>
             )),
             const SizedBox(height: 12),
             _buildRoleSelection(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // ── Role-Specific Fields ──
-            if (_selectedRole == UserRole.student) ..._buildStudentFields(),
-            if (_selectedRole == UserRole.teacher) ..._buildTeacherFields(),
-
+            // ── ALS Center Selection (NEW) ──
+            if (_isLoadingCenters)
+              const LinearProgressIndicator()
+            else
+              DropdownButtonFormField<LearningCenter>(
+                value: _selectedCenter,
+                decoration: const InputDecoration(
+                  labelText: 'Your ALS Center *',
+                  prefixIcon: Icon(Icons.location_city_outlined),
+                ),
+                items: _centers.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
+                onChanged: (v) => setState(() => _selectedCenter = v),
+                validator: (v) => v == null ? 'Please select a center' : null,
+              ),
             const SizedBox(height: 16),
 
             // ── Common Fields ──
-            // First Name
             TextFormField(
               controller: _firstNameController,
               textCapitalization: TextCapitalization.words,
@@ -257,7 +280,6 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
             const SizedBox(height: 12),
 
-            // Last Name
             TextFormField(
               controller: _lastNameController,
               textCapitalization: TextCapitalization.words,
@@ -269,15 +291,34 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
             const SizedBox(height: 12),
 
-            // Gender
-            _buildGenderSelector(),
-            const SizedBox(height: 12),
+            // ── Role-Specific Fields ──
+            if (_selectedRole == UserRole.student) 
+              TextFormField(
+                controller: _studentIdController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Student LRN (12 digits) *',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'LRN is required';
+                  if (v.trim().length != 12) return 'LRN must be exactly 12 digits';
+                  if (!RegExp(r'^\d+$').hasMatch(v.trim())) return 'Numbers only';
+                  return null;
+                },
+              ),
+            
+            if (_selectedRole == UserRole.teacher)
+              TextFormField(
+                controller: _empIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Employee ID *',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Employee ID is required' : null,
+              ),
 
-            // Birthdate (Student only)
-            if (_selectedRole == UserRole.student) ...[
-              _buildBirthDatePicker(),
-              const SizedBox(height: 12),
-            ],
+            const SizedBox(height: 12),
 
             // Email
             TextFormField(
@@ -317,56 +358,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                 return null;
               },
             ),
-            const SizedBox(height: 12),
-
-            // Confirm Password
-            TextFormField(
-              controller: _confirmPasswordController,
-              obscureText: !_isConfirmPasswordVisible,
-              decoration: InputDecoration(
-                labelText: 'Confirm Password *',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(_isConfirmPasswordVisible
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined),
-                  onPressed: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
-                ),
-              ),
-              validator: (v) {
-                if (v != _passwordController.text) return 'Passwords do not match';
-                return null;
-              },
-            ),
-
-            // ── Optional Student Fields ──
-            if (_selectedRole == UserRole.student) ...[
-              const SizedBox(height: 20),
-              Text('Optional — you can add these later',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AlsColors.textHint),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _lastSchoolController,
-                decoration: const InputDecoration(
-                  labelText: 'Last School Attended',
-                  prefixIcon: Icon(Icons.school_outlined),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _lastYearController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Year Last Attended',
-                  prefixIcon: Icon(Icons.calendar_today_outlined),
-                ),
-              ),
-            ],
 
             const SizedBox(height: 24),
 
-            // ── Register / Google buttons ──
+            // ── Register Button ──
             BlocBuilder<AuthBloc, AuthState>(
               builder: (context, state) {
                 final isLoading = state is AuthLoading;
@@ -380,38 +375,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                       : const Text('Create Account'),
                 );
               },
-            ),
-            const SizedBox(height: 12),
-
-            // Divider
-            Row(
-              children: [
-                const Expanded(child: Divider()),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('or', style: Theme.of(context).textTheme.bodySmall),
-                ),
-                const Expanded(child: Divider()),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Google Register
-            OutlinedButton.icon(
-              onPressed: () {
-                context.read<AuthBloc>().add(
-                      AuthLoginWithGoogleRequested(
-                        preferredRole: _selectedRole,
-                      ),
-                    );
-              },
-              icon: const Icon(Icons.g_mobiledata, size: 24),
-              label: const Text('Register with Google'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: const BorderSide(color: AlsColors.divider),
-                foregroundColor: AlsColors.textPrimary,
-              ),
             ),
             const SizedBox(height: 16),
 
@@ -431,97 +394,6 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
       ),
     );
-  }
-
-  // ── Student-specific fields ──
-  List<Widget> _buildStudentFields() {
-    return [
-      TextFormField(
-        controller: _studentIdController,
-        decoration: const InputDecoration(
-          labelText: 'Student ID / LRN *',
-          prefixIcon: Icon(Icons.badge_outlined),
-          hintText: 'e.g. 401234567890',
-        ),
-        validator: (v) => (v == null || v.trim().isEmpty) ? 'Student ID is required' : null,
-      ),
-      const SizedBox(height: 12),
-    ];
-  }
-
-  // ── Teacher-specific fields ──
-  List<Widget> _buildTeacherFields() {
-    return [
-      TextFormField(
-        controller: _empIdController,
-        decoration: const InputDecoration(
-          labelText: 'Employee ID *',
-          prefixIcon: Icon(Icons.badge_outlined),
-        ),
-        validator: (v) => (v == null || v.trim().isEmpty) ? 'Employee ID is required' : null,
-      ),
-      const SizedBox(height: 12),
-      TextFormField(
-        controller: _centerLocationController,
-        decoration: const InputDecoration(
-          labelText: 'Center / Location *',
-          prefixIcon: Icon(Icons.location_on_outlined),
-          hintText: 'e.g. Barangay Hall, San Pedro',
-        ),
-        validator: (v) => (v == null || v.trim().isEmpty) ? 'Center location is required' : null,
-      ),
-      const SizedBox(height: 12),
-    ];
-  }
-
-  Widget _buildGenderSelector() {
-    return DropdownButtonFormField<String>(
-      value: _selectedGender,
-      decoration: const InputDecoration(
-        labelText: 'Gender *',
-        prefixIcon: Icon(Icons.wc_outlined),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'Male', child: Text('Male')),
-        DropdownMenuItem(value: 'Female', child: Text('Female')),
-      ],
-      onChanged: (v) => setState(() => _selectedGender = v ?? 'Male'),
-    );
-  }
-
-  Widget _buildBirthDatePicker() {
-    return GestureDetector(
-      onTap: _pickBirthDate,
-      child: AbsorbPointer(
-        child: TextFormField(
-          decoration: InputDecoration(
-            labelText: 'Birth Date *',
-            prefixIcon: const Icon(Icons.cake_outlined),
-            hintText: _birthDate != null
-                ? '${_birthDate!.month}/${_birthDate!.day}/${_birthDate!.year}'
-                : 'Tap to select',
-          ),
-          controller: TextEditingController(
-            text: _birthDate != null
-                ? '${_birthDate!.month}/${_birthDate!.day}/${_birthDate!.year}'
-                : '',
-          ),
-          validator: (_) => _birthDate == null ? 'Birth date is required' : null,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickBirthDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2005, 1, 1),
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) {
-      setState(() => _birthDate = picked);
-    }
   }
 
   Widget _buildRoleSelection() {
@@ -583,13 +455,6 @@ class _RegisterScreenState extends State<RegisterScreen>
               color: isSelected ? AlsColors.primary : AlsColors.textPrimary,
               fontWeight: FontWeight.w600,
             )),
-            const SizedBox(height: 4),
-            Text(description,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AlsColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
       ),
@@ -598,32 +463,17 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   void _onRegisterPressed() {
     if (_formKey.currentState?.validate() ?? false) {
-      final fullName =
-          '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
-
       context.read<AuthBloc>().add(
             AuthSignUpWithRoleRequested(
               email: _emailController.text.trim(),
               password: _passwordController.text,
-              fullName: fullName,
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
               role: _selectedRole,
-              studentId: _studentIdController.text.trim().isNotEmpty
-                  ? _studentIdController.text.trim()
-                  : null,
-              empId: _empIdController.text.trim().isNotEmpty
-                  ? _empIdController.text.trim()
-                  : null,
+              studentId: _selectedRole == UserRole.student ? _studentIdController.text.trim() : null,
+              empId: _selectedRole == UserRole.teacher ? _empIdController.text.trim() : null,
+              centerLocation: _selectedCenter?.id, // Passing the UUID
               gender: _selectedGender,
-              birthDate: _birthDate?.toIso8601String(),
-              lastSchool: _lastSchoolController.text.trim().isNotEmpty
-                  ? _lastSchoolController.text.trim()
-                  : null,
-              lastYearAttended: _lastYearController.text.trim().isNotEmpty
-                  ? _lastYearController.text.trim()
-                  : null,
-              centerLocation: _centerLocationController.text.trim().isNotEmpty
-                  ? _centerLocationController.text.trim()
-                  : null,
             ),
           );
     }

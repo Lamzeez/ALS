@@ -24,10 +24,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _courseService = CourseService();
+  final _syncService = OfflineSyncService.instance;
 
   List<Module> _modules = [];
   Map<String, List<Lesson>> _lessonsByModule = {};
-  List<ModuleProgress> _moduleProgress = [];
+  Map<String, ModuleProgress> _progressMap = {}; // Optimized lookup
   bool _isLoading = true;
 
   @override
@@ -43,41 +44,44 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     super.dispose();
   }
 
+  /// 🚀 Optimized: Fetches all data in parallel to avoid "N+1" delay
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
+    
     try {
-      _modules = await _courseService.getModules(widget.courseId);
-      _moduleProgress = await _courseService.getModuleProgress(widget.courseId);
+      // 1. Fetch basic course structure
+      final results = await Future.wait([
+        _courseService.getModules(widget.courseId),
+        _courseService.getModuleProgress(widget.courseId),
+      ]);
 
-      // Load lessons for each module
-      for (final module in _modules) {
-        final moduleId = module.id;
-        _lessonsByModule[moduleId] = await _courseService.getLessons(moduleId);
+      _modules = results[0] as List<Module>;
+      final rawProgress = results[1] as List<ModuleProgress>;
+      
+      // 2. Map progress for O(1) lookup
+      _progressMap = {for (var p in rawProgress) p.moduleId: p};
+
+      // 3. Parallel fetch lessons for all modules
+      final lessonFutures = _modules.map((m) => _courseService.getLessons(m.id)).toList();
+      final allLessons = await Future.wait(lessonFutures);
+
+      for (int i = 0; i < _modules.length; i++) {
+        _lessonsByModule[_modules[i].id] = allLessons[i];
       }
+
     } catch (e) {
-      debugPrint('Error loading course data: $e');
+      debugPrint('[CourseDetail] Error hydrating screen: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  double _getModuleMastery(String moduleId) {
-    final progress = _moduleProgress.where((p) => p.moduleId == moduleId);
-    if (progress.isEmpty) return 0;
-    return progress.first.masteryScore ?? 0;
-  }
+  double _getModuleMastery(String moduleId) => _progressMap[moduleId]?.masteryScore ?? 0;
 
-  String _getModuleStatus(String moduleId) {
-    final progress = _moduleProgress.where((p) => p.moduleId == moduleId);
-    if (progress.isEmpty) return 'not_started';
-    return progress.first.status.name;
-  }
+  String _getModuleStatus(String moduleId) => _progressMap[moduleId]?.status.name ?? 'not_started';
 
-  int _getLessonsViewed(String moduleId) {
-    final progress = _moduleProgress.where((p) => p.moduleId == moduleId);
-    if (progress.isEmpty) return 0;
-    return progress.first.lessonsViewed ?? 0;
-  }
+  int _getLessonsViewed(String moduleId) => _progressMap[moduleId]?.lessonsViewed ?? 0;
 
   @override
   Widget build(BuildContext context) {
@@ -131,20 +135,19 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       );
     }
 
-    // Overall progress
+    // Overall progress calculation
     final totalModules = _modules.length;
-    final completedModules = _moduleProgress
-        .where((p) => p.status == 'completed' || p.status == 'mastered')
+    final completedModules = _progressMap.values
+        .where((p) => p.status == ProgressStatus.completed || p.status == ProgressStatus.mastered)
         .length;
-    final overallProgress =
-        totalModules > 0 ? completedModules / totalModules : 0.0;
+    final overallProgress = totalModules > 0 ? completedModules / totalModules : 0.0;
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Overall progress card
+          // ── Overall Progress Card ──
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -158,20 +161,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               children: [
                 const Text(
                   'Course Progress',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   '${(overallProgress * 100).toInt()}%',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 ClipRRect(
@@ -193,7 +188,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           ),
           const SizedBox(height: 20),
 
-          // Module list
+          // ── Module List ──
           ...List.generate(_modules.length, (index) {
             final module = _modules[index];
             final moduleId = module.id;
@@ -256,11 +251,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             if (mastery > 0)
               Text(
                 '${mastery.toInt()}%',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
-                ),
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor),
               ),
           ],
         ),
@@ -273,10 +264,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             const SizedBox(height: 4),
             Text(
               '$lessonsViewed/${lessons.length} lessons viewed',
-              style: TextStyle(
-                fontSize: 11,
-                color: AlsColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 11, color: AlsColors.textSecondary),
             ),
           ],
         ),
@@ -310,24 +298,21 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 title: Text(lessonTitle),
                 subtitle: Text(
                   contentType.replaceAll('_', ' '),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AlsColors.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 11, color: AlsColors.textSecondary),
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () async {
-                  // Mark module as in_progress if not started
+                  // 🛡️ Reliable Progress Tracking: Uses OfflineSyncService
                   if (status == 'not_started' || status == 'locked') {
-                    try {
-                      await _courseService.upsertModuleProgress(
+                    final studentId = AuthService().currentUser?.id;
+                    if (studentId != null) {
+                      await _syncService.trackModuleProgress(
+                        studentId: studentId,
                         moduleId: moduleId,
                         courseId: widget.courseId,
                         status: 'in_progress',
-                        lessonsViewed: 1,
-                        totalLessons: lessons.length,
                       );
-                    } catch (_) {}
+                    }
                   }
 
                   if (!mounted) return;

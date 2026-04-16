@@ -304,10 +304,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               child: CircleAvatar(
                 radius: 44,
                 backgroundColor: AlsColors.primarySurface,
-                backgroundImage: profile?.avatarUrl != null
-                    ? NetworkImage(profile!.avatarUrl!)
+                backgroundImage: profile?.profilePictureUrl != null
+                    ? NetworkImage(profile!.profilePictureUrl!)
                     : null,
-                child: profile?.avatarUrl == null
+                child: profile?.profilePictureUrl == null
                     ? Text(
                         profile?.fullName.isNotEmpty == true
                             ? profile!.fullName[0].toUpperCase()
@@ -687,17 +687,22 @@ class _StudentsViewState extends State<_StudentsView> {
                             final profile = _enrollments[i];
                             final name = profile.fullName;
                             final email = profile.email ?? '';
-                            final lrn = profile.lrn;
+                            final studentIdNumber = profile.studentIdNumber;
                             return ListTile(
                               leading: CircleAvatar(
                                 backgroundColor: AlsColors.primarySurface,
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                                  style: TextStyle(color: AlsColors.primary),
-                                ),
+                                backgroundImage: profile.profilePictureUrl != null 
+                                    ? NetworkImage(profile.profilePictureUrl!) 
+                                    : null,
+                                child: profile.profilePictureUrl == null 
+                                    ? Text(
+                                        name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                                        style: TextStyle(color: AlsColors.primary),
+                                      )
+                                    : null,
                               ),
                               title: Text(name),
-                              subtitle: Text(lrn != null ? 'LRN: $lrn' : email),
+                              subtitle: Text(studentIdNumber != null ? 'LRN: $studentIdNumber' : email),
                             );
                           },
                         ),

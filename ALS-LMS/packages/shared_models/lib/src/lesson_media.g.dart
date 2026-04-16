@@ -7,16 +7,16 @@ part of 'lesson_media.dart';
 // **************************************************************************
 
 LessonMedia _$LessonMediaFromJson(Map<String, dynamic> json) => LessonMedia(
-      id: json['id'] as String,
-      lessonId: json['lesson_id'] as String,
-      storageUrl: json['storage_url'] as String,
-      fileName: json['file_name'] as String,
-      fileType: MediaFileType.fromJson(json['file_type'] as String),
-      fileSizeBytes: (json['file_size_bytes'] as num?)?.toInt(),
-      mimeType: json['mime_type'] as String?,
-      isDownloadable: json['is_downloadable'] as bool? ?? true,
-      orderIndex: (json['order_index'] as num?)?.toInt() ?? 0,
-    );
+  id: json['id'] as String,
+  lessonId: json['lesson_id'] as String,
+  storageUrl: json['storage_url'] as String,
+  fileName: json['file_name'] as String,
+  fileType: MediaFileType.fromJson(json['file_type'] as String),
+  fileSizeBytes: (json['file_size_bytes'] as num?)?.toInt(),
+  mimeType: json['mime_type'] as String?,
+  isDownloadable: json['is_downloadable'] as bool? ?? true,
+  orderIndex: (json['order_index'] as num?)?.toInt() ?? 0,
+);
 
 Map<String, dynamic> _$LessonMediaToJson(LessonMedia instance) =>
     <String, dynamic>{

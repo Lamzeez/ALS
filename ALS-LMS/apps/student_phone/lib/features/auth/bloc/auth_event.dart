@@ -33,22 +33,25 @@ class AuthLoginWithGoogleRequested extends AuthEvent {
 class AuthSignUpRequested extends AuthEvent {
   final String email;
   final String password;
-  final String fullName;
+  final String firstName;
+  final String lastName;
 
   const AuthSignUpRequested({
     required this.email,
     required this.password,
-    required this.fullName,
+    required this.firstName,
+    required this.lastName,
   });
 
   @override
-  List<Object?> get props => [email, password, fullName];
+  List<Object?> get props => [email, password, firstName, lastName];
 }
 
 class AuthSignUpWithRoleRequested extends AuthEvent {
   final String email;
   final String password;
-  final String fullName;
+  final String firstName;
+  final String lastName;
   final UserRole role;
   final String? studentId;
   final String? empId;
@@ -61,7 +64,8 @@ class AuthSignUpWithRoleRequested extends AuthEvent {
   const AuthSignUpWithRoleRequested({
     required this.email,
     required this.password,
-    required this.fullName,
+    required this.firstName,
+    required this.lastName,
     required this.role,
     this.studentId,
     this.empId,
@@ -74,7 +78,7 @@ class AuthSignUpWithRoleRequested extends AuthEvent {
 
   @override
   List<Object?> get props =>
-      [email, password, fullName, role, studentId, empId, gender];
+      [email, password, firstName, lastName, role, studentId, empId, gender];
 }
 
 class AuthLogoutRequested extends AuthEvent {}
@@ -91,17 +95,17 @@ class AuthStateChanged extends AuthEvent {
 /// Fired from OnboardingScreen after the user picks their role post Google sign-in.
 class AuthSetRoleRequested extends AuthEvent {
   final UserRole role;
-  final String? lrn;
+  final String? studentIdNumber;
   final String? empId;
-  final String? districtId;
+  final String? alsCenterId;
 
   const AuthSetRoleRequested({
     required this.role,
-    this.lrn,
+    this.studentIdNumber,
     this.empId,
-    this.districtId,
+    this.alsCenterId,
   });
 
   @override
-  List<Object?> get props => [role, lrn, empId, districtId];
+  List<Object?> get props => [role, studentIdNumber, empId, alsCenterId];
 }

@@ -8,10 +8,10 @@ import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/register_screen.dart';
 import '../features/auth/screens/pending_approval_screen.dart';
 import '../features/auth/screens/onboarding_screen.dart';
-import '../features/student/dashboard/screens/dashboard_screen.dart'; // Updated path
+import '../features/student/dashboard/screens/dashboard_screen.dart';
 import '../features/teacher/screens/teacher_dashboard_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
-import '../features/student/enrollment/screens/enroll_course_screen.dart'; // Updated path
+import '../features/student/enrollment/screens/enroll_course_screen.dart';
 
 /// A class that converts a Stream into a Listenable for GoRouter.
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -68,6 +68,7 @@ class AlsRouter {
 
         // 5. Handle Authenticated Users
         if (authState is AuthAuthenticated) {
+          // If they are on a guest screen but logged in, move them to their dashboard
           if (isLoggingIn || isRegistering || isSplashing || state.matchedLocation == '/onboarding') {
             final role = authState.profile?.role;
             if (role == UserRole.teacher || 
