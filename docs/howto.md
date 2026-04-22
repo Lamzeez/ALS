@@ -114,6 +114,157 @@ Copy the **SHA1** value → send it to the repo owner → they register it in Su
 
 ---
 
+## Supabase Setup & Database Work
+
+### Access the Dashboard
+
+1. Go to [https://supabase.com/dashboard](https://supabase.com/dashboard) and sign in
+2. Open the project — Project ID: **`trixvamgvaihvuqpyjwc`**
+3. Ask the **project owner (Dave)** to invite you:
+   - Supabase Dashboard → Project Settings → Team → Invite Member → enter your email
+
+> You can run the app with just the `.env` keys. Supabase dashboard access is only needed if you want to create/edit tables, run SQL, or manage storage.
+
+---
+
+### Run Existing Migrations
+
+All migrations live in `supabase/migrations/`. To apply them to the cloud project, run them in order via the Supabase SQL Editor:
+
+1. Supabase Dashboard → **SQL Editor** → New Query
+2. Open each file from `supabase/migrations/` (oldest to newest) and paste + run:
+
+| Order | File |
+|---|---|
+| 1 | `20260301_base_users_table.sql` |
+| 2 | `20260309_comprehensive_schema.sql` |
+| 3 | `20260310_missing_tables.sql` |
+| 4 | `20260311_fix_schema_and_policies.sql` |
+| 5 | `20260312_fix_schema_issues.sql` |
+| 6 | `20260321_fix_profile_storage_policies.sql` |
+| 7 | `20260414_add_missing_tables.sql` |
+| 8 | `20260415_rls_policies_fixed.sql` |
+| 9 | `20260416_enable_rls.sql` |
+| 10 | `20260416_fix_onboarding_and_metadata.sql` |
+
+> **Note**: These are already applied to the live project. Only run them if setting up a brand-new Supabase project from scratch.
+
+---
+
+### Create a New Table
+
+**Option 1 — SQL Editor (recommended for complex tables)**
+
+1. Supabase Dashboard → SQL Editor → New Query
+2. Write your SQL, for example:
+   ```sql
+   CREATE TABLE IF NOT EXISTS public.feedback (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     student_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+     message TEXT NOT NULL,
+     created_at TIMESTAMPTZ DEFAULT NOW()
+   );
+
+   -- Auto-update timestamp
+   CREATE TRIGGER update_feedback_updated_at
+     BEFORE UPDATE ON public.feedback
+     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+   ```
+3. Click **Run**
+
+**Option 2 — Table Editor (GUI, simpler)**
+
+1. Supabase Dashboard → Table Editor → New Table
+2. Fill in table name, columns, types, and constraints via the UI
+3. Click **Save**
+
+---
+
+### Add Row Level Security (RLS) to a New Table
+
+Every new table **must have RLS enabled** or all data will be publicly readable/writable.
+
+```sql
+-- 1. Enable RLS on your new table
+ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
+
+-- 2. Add policies (examples)
+
+-- Students can only read/write their own feedback
+CREATE POLICY "Students can insert own feedback"
+  ON public.feedback FOR INSERT
+  WITH CHECK (student_id = auth.uid());
+
+CREATE POLICY "Students can read own feedback"
+  ON public.feedback FOR SELECT
+  USING (student_id = auth.uid());
+
+-- Admins can read everything
+CREATE POLICY "Admins can read all feedback"
+  ON public.feedback FOR SELECT
+  USING (current_user_role() = 'admin');
+```
+
+> The `current_user_role()` function already exists in this project — use it for role-based policies to avoid RLS recursion.
+
+---
+
+### Save Your Migration
+
+After creating a new table or policy, save it as a migration file so the team has a record:
+
+1. Create a new file in `supabase/migrations/` with today's date:
+   ```
+   supabase/migrations/20260422_add_feedback_table.sql
+   ```
+2. Paste the SQL you ran into the file
+3. Commit and push it:
+   ```powershell
+   git add supabase/migrations/
+   git commit -m "feat(db): add feedback table with RLS"
+   git push private main
+   ```
+
+---
+
+### Supabase CLI (Optional — for local dev)
+
+The CLI is already installed via `npm install`. Use it to manage migrations locally:
+
+```powershell
+# From the repo root
+
+# List all migrations
+npx supabase migration list
+
+# Create a new blank migration file
+npx supabase migration new add_feedback_table
+
+# Push local migrations to the live project (requires login)
+npx supabase login
+npx supabase db push
+```
+
+---
+
+### Add a Storage Bucket (for file uploads)
+
+1. Supabase Dashboard → Storage → New Bucket
+2. Set a name (e.g., `student-submissions`)
+3. Choose **Public** or **Private** access
+4. Add storage policies in SQL Editor:
+   ```sql
+   -- Allow authenticated users to upload to their own folder
+   CREATE POLICY "Students can upload own files"
+     ON storage.objects FOR INSERT
+     WITH CHECK (
+       bucket_id = 'student-submissions' AND
+       auth.uid()::text = (storage.foldername(name))[1]
+     );
+   ```
+
+---
+
 ## Quick Troubleshooting
 
 | Problem | Fix |
