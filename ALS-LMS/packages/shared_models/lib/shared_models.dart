@@ -19,6 +19,8 @@ export 'src/lesson.dart';
 export 'src/lesson_media.dart';
 export 'src/quiz.dart';
 export 'src/quiz_question.dart';
+export 'src/session.dart';
+export 'src/download.dart';
 
 // Progress & Grading
 export 'src/module_progress.dart';

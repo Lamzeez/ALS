@@ -30,8 +30,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLogoutRequested>(_onLogout);
     on<AuthStateChanged>(_onAuthStateChanged);
 
-    // Listen to auth state changes from Supabase
-    _authSubscription = _authService.onAuthStateChange.listen((data) {
+    // Listen to auth state changes from Supabase (if initialized)
+    _authSubscription = _authService.onAuthStateChange?.listen((data) {
       if (data.event == supa.AuthChangeEvent.signedIn ||
           data.event == supa.AuthChangeEvent.tokenRefreshed) {
         add(AuthStateChanged(isAuthenticated: true));

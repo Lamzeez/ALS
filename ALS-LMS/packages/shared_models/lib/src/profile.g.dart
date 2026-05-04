@@ -22,7 +22,7 @@ Profile _$ProfileFromJson(Map<String, dynamic> json) => Profile(
   approvalStatus: json['approval_status'] == null
       ? ApprovalStatus.approved
       : ApprovalStatus.fromJson(json['approval_status'] as String?),
-  onboardingCompleted: json['onboarding_completed'] as bool? ?? true,
+  onboardingCompleted: json['onboarding_completed'] as bool? ?? false,
   employeeId: json['employee_id'] as String?,
   createdAt: json['created_at'] == null
       ? null

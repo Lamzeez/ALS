@@ -20,6 +20,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   int _currentIndex = 0;
   final _courseService = CourseService();
   final _announcementService = AnnouncementService();
+  final _sessionService = SessionService();
   final _systemService = SystemService();
 
   List<Course> _courses = [];
@@ -136,6 +137,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         children: [
           _buildCoursesTab(),
           _buildAnnouncementsTab(),
+          _buildSessionsTab(),
           _buildStudentsTab(),
           _buildProfileTab(),
         ],
@@ -153,6 +155,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             icon: Icon(Icons.campaign_outlined),
             selectedIcon: Icon(Icons.campaign),
             label: 'Announce',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.event_note_outlined),
+            selectedIcon: Icon(Icons.event_note),
+            label: 'Sessions',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
@@ -278,7 +285,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // Tab 2: Students
+  // Tab 2: Sessions
+  // ─────────────────────────────────────────────────────────
+  Widget _buildSessionsTab() {
+    return _SessionsManager(
+      sessionService: _sessionService,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Tab 3: Students
   // ─────────────────────────────────────────────────────────
   Widget _buildStudentsTab() {
     if (_selectedCourse == null) {
@@ -291,7 +307,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // Tab 3: Profile
+  // Tab 4: Profile
   // ─────────────────────────────────────────────────────────
   Widget _buildProfileTab() {
     return BlocBuilder<AuthBloc, AuthState>(
@@ -712,3 +728,193 @@ class _StudentsViewState extends State<_StudentsView> {
           );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Sub-widget: Sessions manager for teacher
+// ─────────────────────────────────────────────────────────────────────
+class _SessionsManager extends StatefulWidget {
+  final SessionService sessionService;
+
+  const _SessionsManager({required this.sessionService});
+
+  @override
+  State<_SessionsManager> createState() => _SessionsManagerState();
+}
+
+class _SessionsManagerState extends State<_SessionsManager> {
+  List<Session> _sessions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _isLoading = true);
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated && authState.profile != null) {
+        _sessions = await widget.sessionService.getTeacherSessions(authState.profile!.id);
+      }
+    } catch (e) {
+      debugPrint('[Teacher] Error loading sessions: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _sessions.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event_note_outlined, size: 64, color: AlsColors.textHint),
+                          const SizedBox(height: 12),
+                          Text('No sessions scheduled', style: Theme.of(context).textTheme.titleMedium),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _sessions.length,
+                      itemBuilder: (_, i) => _buildCard(_sessions[i]),
+                    ),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateSheet,
+        icon: const Icon(Icons.add),
+        label: const Text('New Session'),
+      ),
+    );
+  }
+
+  Widget _buildCard(Session s) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AlsColors.primarySurface,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.event, color: AlsColors.primary),
+        ),
+        title: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${s.scheduledAt.toLocal()}'.split('.')[0]),
+            if (s.location != null) Text('📍 ${s.location}'),
+          ],
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _getStatusColor(s.status).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            s.status.name.toUpperCase(),
+            style: TextStyle(color: _getStatusColor(s.status), fontWeight: FontWeight.bold, fontSize: 10),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(SessionStatus status) {
+    switch (status) {
+      case SessionStatus.scheduled: return AlsColors.warning;
+      case SessionStatus.live: return AlsColors.online;
+      case SessionStatus.completed: return AlsColors.success;
+      case SessionStatus.cancelled: return AlsColors.error;
+    }
+  }
+
+  void _showCreateSheet() {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final locCtrl = TextEditingController();
+    DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Schedule Session', style: Theme.of(ctx).textTheme.titleLarge),
+                const SizedBox(height: 16),
+                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Title')),
+                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
+                TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location')),
+                const SizedBox(height: 16),
+                ListTile(
+                  title: const Text('Date & Time'),
+                  subtitle: Text(selectedDate.toString()),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: ctx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) {
+                      final time = await showTimePicker(
+                        context: ctx,
+                        initialTime: TimeOfDay.fromDateTime(selectedDate),
+                      );
+                      if (time != null) {
+                        setSheetState(() => selectedDate = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final authState = context.read<AuthBloc>().state;
+                      if (authState is AuthAuthenticated && authState.profile != null) {
+                        await widget.sessionService.createSession(
+                          teacherId: authState.profile!.id,
+                          title: titleCtrl.text.trim(),
+                          description: descCtrl.text.trim(),
+                          location: locCtrl.text.trim(),
+                          scheduledAt: selectedDate,
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _load();
+                      }
+                    },
+                    child: const Text('Schedule'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+}
+

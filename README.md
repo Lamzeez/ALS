@@ -51,11 +51,14 @@ The **ALS Study Companion** is an offline-first, multi-platform Learning Managem
 
 ```
 ALS Study Companion/
-├── als_study_companion/          ← Dart monorepo root
-│   ├── shared_core/              ← Pure Dart library (models, enums, utils)
-│   ├── backend_services/         ← Flutter library (Supabase service layer)
-│   ├── admin_web/                ← Flutter Web app (Admin panel)
-│   └── mobile_app/               ← Flutter Mobile app (Student & Teacher)
+├── ALS-LMS/                      ← Monorepo Root
+│   ├── apps/
+│   │   ├── admin_web/            ← Flutter Web app (Admin portal)
+│   │   └── student_phone/        ← Flutter Mobile app (Student & Teacher)
+│   ├── packages/
+│   │   ├── shared_models/        ← Unified data models (matching Supabase schema)
+│   │   ├── shared_services/      ← Core business logic (Auth, Supabase, Sync, Storage)
+│   │   └── shared_ui/            ← Reusable design system components
 ├── supabase/
 │   ├── config.toml
 │   └── migrations/               ← SQL migration history
@@ -65,17 +68,17 @@ ALS Study Companion/
 ### Dependency Graph
 
 ```
-shared_core  (no external deps)
+shared_models (no internal deps)
      ▲
      │
-backend_services  (depends on shared_core + supabase_flutter)
+shared_services (depends on shared_models)
      ▲
      ├──────────────┐
-admin_web         mobile_app
+admin_web         student_phone
 (depends on       (depends on
- shared_core +     shared_core +
- backend_services) backend_services +
-                   sqflite + drift + ...)
+ shared_models +   shared_models +
+ shared_services + shared_services +
+ shared_ui)        shared_ui)
 ```
 
 ---
@@ -955,50 +958,37 @@ intl: ^0.19.0
 
 ## 15. Known Issues / TODOs
 
-| # | Location | Issue |
-|---|---|---|
-| 1 | `StudentProgressView` | `CircularProgressIndicator(value: 0.0)` hardcoded — not wired to `ProgressViewModel.overallProgress` |
-| 2 | `StudentDownloadsView` | Placeholder only — no functional download UI |
-| 3 | `TeacherSessionsView` | Placeholder empty-state — session creation form is TODO |
-| 4 | `TeacherStudentsView` | Placeholder — "Students will appear here once assigned by admin" |
-| 5 | `TeacherAnnouncementsView` | Placeholder — announcement creation form is TODO |
-| 6 | `TeacherLessonCreateView` | `teacherId: ''` hardcoded — should read from `AuthViewModel.currentUser.id` |
-| 7 | `QuizCreatorRepository` | Uses camelCase column names (`teacherId`, `updatedAt`) inconsistent with `TeacherLessonRepository` (snake_case `teacher_id`, `updated_at`) |
-| 8 | `StudentMonitorRepository` | Filters by camelCase `teacherId` — may break on Supabase cloud data which uses snake_case |
-| 9 | `admin_web/main.dart` | Supabase anon key hardcoded — should use environment config like mobile_app does via `.env` |
-| 10 | Migrations | `20260311_fix_schema_and_policies.sql` and `20260311_fix_schema_issues.sql` are near-duplicates applied same day — risk of `ALTER TABLE` conflicts if run without idempotent guards |
+| # | Location | Issue | Status |
+|---|---|---|---|
+| 1 | `DashboardScreen` | Biometric setup UI flow is partially implemented | ⚠️ WIP |
+| 2 | `admin_web` | Batch user import CSV validation could be more robust | ⚠️ WIP |
+| 3 | `Supabase` | Storage policies for profile pictures need refinement | ⚠️ WIP |
 
 ---
 
 ## 16. Quick Start
 
 ```bash
-# 1. Install Flutter SDK >= 3.11.0
+# 1. Install Flutter SDK >= 3.22.0
 
 # 2. Install all package dependencies
-cd als_study_companion/shared_core && flutter pub get
-cd ../backend_services && flutter pub get
-cd ../admin_web && flutter pub get
-cd ../mobile_app && flutter pub get
+cd ALS-LMS/packages/shared_models && flutter pub get
+cd ../shared_services && flutter pub get
+cd ../shared_ui && flutter pub get
+cd ../../apps/admin_web && flutter pub get
+cd ../student_phone && flutter pub get
 
-# 3. Configure environment (mobile_app)
-cp als_study_companion/mobile_app/.env.example als_study_companion/mobile_app/.env
+# 3. Configure environment
+cp .env.example .env
 # Fill in: SUPABASE_URL and SUPABASE_ANON_KEY
 
-# 4. Run Supabase migrations
-# Apply files in supabase/migrations/ in chronological order
-
-# 5. Run mobile app
-cd als_study_companion/mobile_app
+# 4. Run mobile app
+cd ALS-LMS/apps/student_phone
 flutter run
 
-# 6. Run admin web
-cd als_study_companion/admin_web
+# 5. Run admin web
+cd ALS-LMS/apps/admin_web
 flutter run -d chrome
-
-# 7. Run tests
-cd als_study_companion/mobile_app && flutter test
-cd als_study_companion/admin_web && flutter test
 ```
 
 See [docs/SETUP.md](docs/SETUP.md) for detailed developer setup, Supabase project configuration, and Google OAuth setup.

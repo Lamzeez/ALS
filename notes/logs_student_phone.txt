@@ -1,76 +1,59 @@
+PS D:\Documents\Studies\SY_2025-2026\SEM2\EmergingTech\ALS-Bondave\emerging-tech-Als-LMS\ALS-LMS\apps\student_phone> flutter run -d chrome
+This application is not configured to build on the web.
+To add web support to a project, run `flutter create .`.
 Launching lib\main.dart on Chrome in debug mode...
-lib/features/student/dashboard/screens/dashboard_screen.dart:131:45: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                  backgroundImage: profile?.avatarUrl != null
-                                            ^^^^^^^^^
-lib/features/student/dashboard/screens/dashboard_screen.dart:132:47: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                      ? NetworkImage(profile!.avatarUrl!)
-                                              ^^^^^^^^^
-lib/features/student/dashboard/screens/dashboard_screen.dart:134:35: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                  child: profile?.avatarUrl == null
-                                  ^^^^^^^^^
-lib/features/student/dashboard/screens/dashboard_screen.dart:864:49: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                      backgroundImage: profile?.avatarUrl != null
-                                                ^^^^^^^^^
-lib/features/student/dashboard/screens/dashboard_screen.dart:865:51: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                          ? NetworkImage(profile!.avatarUrl!)
-                                                  ^^^^^^^^^
-lib/features/student/dashboard/screens/dashboard_screen.dart:867:39: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                      child: profile?.avatarUrl == null
-                                      ^^^^^^^^^
-lib/features/student/dashboard/screens/dashboard_screen.dart:911:26: Error: The getter 'lrn' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
-            if (profile?.lrn != null) ...[
-                         ^^^
-lib/features/student/dashboard/screens/dashboard_screen.dart:915:48: Error: The getter 'lrn' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
-                  label: Text('LRN: ${profile!.lrn}'),
-                                               ^^^
-lib/features/teacher/screens/teacher_dashboard_screen.dart:307:43: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                backgroundImage: profile?.avatarUrl != null
-                                          ^^^^^^^^^
-lib/features/teacher/screens/teacher_dashboard_screen.dart:308:45: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                    ? NetworkImage(profile!.avatarUrl!)
-                                            ^^^^^^^^^
-lib/features/teacher/screens/teacher_dashboard_screen.dart:310:33: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-                child: profile?.avatarUrl == null
-                                ^^^^^^^^^
-lib/features/teacher/screens/teacher_dashboard_screen.dart:690:49: Error: The getter 'lrn' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
-                            final lrn = profile.lrn;
-                                                ^^^
-lib/features/student/dashboard/screens/settings_screen.dart:35:44: Error: The getter 'lrn' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lrn'.
-      _lrnController.text = state.profile!.lrn ?? '';
-                                           ^^^
-lib/features/student/dashboard/screens/settings_screen.dart:179:53: Error: The getter 'avatarUrl' isn't defined for the type 'Profile'.
- - 'Profile' is from 'package:shared_models/src/profile.dart' ('../../packages/shared_models/lib/src/profile.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'avatarUrl'.
-        state is AuthAuthenticated ? state.profile?.avatarUrl : null;
-                                                    ^^^^^^^^^
-lib/features/student/dashboard/screens/settings_screen.dart:287:9: Error: No named parameter with the name 'lrn'.
-        lrn: _lrnController.text.trim().isNotEmpty
-        ^^^
 Waiting for connection from debug service on Chrome...             21.9s
-Failed to compile application.
+
+Flutter run key commands.
+r Hot reload. 
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+This app is linked to the debug service: ws://127.0.0.1:62325/UyY8wJgK8Lw=/ws
+Debug service listening on ws://127.0.0.1:62325/UyY8wJgK8Lw=/ws
+A Dart VM Service on Chrome is available at: http://127.0.0.1:62325/UyY8wJgK8Lw=
+The Flutter DevTools debugger and profiler on Chrome is available at: http://127.0.0.1:62325/UyY8wJgK8Lw=/devtools/?uri=ws://127.0.0.1:62325/UyY8wJgK8Lw=/ws
+Starting application from main method in: org-dartlang-app:/web_entrypoint.dart.
+Error while trying to load an asset: Flutter Web engine failed to fetch "assets/.env". HTTP request succeeded, but the server responded with HTTP status 404.
+[ALS] .env load failed: Instance of 'FileNotFoundError'
+[ALS] Supabase init failed: Instance of 'NotInitializedError' — Launching in offline mode.
+══╡ EXCEPTION CAUGHT BY WIDGETS LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown building _FocusInheritedScope:
+Assertion failed:
+file:///C:/Users/Dave/AppData/Local/Pub/Cache/hosted/pub.dev/supabase_flutter-2.12.2/lib/src/supabase.dart:45:7
+_instance._isInitialized
+"You must initialize the supabase instance before calling Supabase.instance"
+
+When the exception was thrown, this was the stack:
+dart-sdk/lib/_internal/js_dev_runtime/private/ddc_runtime/errors.dart 274:3  throw_
+dart-sdk/lib/_internal/js_dev_runtime/private/ddc_runtime/errors.dart 44:3   assertFailed
+package:supabase_flutter/src/supabase.dart 45:17                             get instance
+package:shared_services/src/supabase_client.dart 58:57                       get client
+package:shared_services/src/auth_service.dart 10:53                          get [_client]
+package:shared_services/src/auth_service.dart 18:20                          get onAuthStateChange
+package:student_phone/features/auth/bloc/auth_bloc.dart 34:56                new
+package:student_phone/app/app.dart 29:17                                     initState
+package:flutter/src/widgets/framework.dart 5953:55                           [_firstBuild]
+package:flutter/src/widgets/framework.dart 5796:5                            mount
+...     Normal element mounting (63 frames)
+package:flutter/src/widgets/framework.dart 4590:19                           inflateWidget
+package:flutter/src/widgets/framework.dart 4059:18                           updateChild
+package:flutter/src/widgets/view.dart 481:16                                 [_updateChild]
+package:flutter/src/widgets/view.dart 504:5                                  mount
+...     Normal element mounting (15 frames)
+package:flutter/src/widgets/framework.dart 4590:19                           inflateWidget
+package:flutter/src/widgets/framework.dart 4059:18                           updateChild
+package:flutter/src/widgets/binding.dart 1782:16                             [_rebuild]
+package:flutter/src/widgets/binding.dart 1751:5                              mount
+package:flutter/src/widgets/binding.dart 1704:16                             <fn>
+package:flutter/src/widgets/framework.dart 3101:11                           buildScope
+package:flutter/src/widgets/binding.dart 1703:12                             attach
+package:flutter/src/widgets/binding.dart 1379:26                             attachToBuildOwner
+package:flutter/src/widgets/binding.dart 1364:5                              attachRootWidget
+package:flutter/src/widgets/binding.dart 1350:7                              <fn>
+dart-sdk/lib/_internal/js_dev_runtime/private/isolate_helper.dart 47:11      internalCallback
+
+════════════════════════════════════════════════════════════════════════════════════════════════════

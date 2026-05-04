@@ -24,9 +24,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _courseService = CourseService();
   final _systemService = SystemService();
   final _announcementService = AnnouncementService();
+  final _downloadsService = DownloadsService();
 
   List<CourseEnrollment> _enrolledCourses = [];
   List<Announcement> _announcements = [];
+  List<Download> _downloads = [];
   Map<String, List<ModuleProgress>> _courseProgress = {};
   bool _isLoadingCourses = true;
   bool _isLoadingAnnouncements = true;
@@ -85,11 +87,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _loadDownloads() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated && authState.profile != null) {
+        _downloads = await _downloadsService.getStudentDownloads(authState.profile!.id);
+        if (mounted) setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error loading downloads: $e');
+    }
+  }
+
   Future<void> _refreshAll() async {
-    await Future.wait([
+    await Future.wait<void>([
       _checkSystemStatus(),
       _loadEnrolledCourses(),
       _loadAnnouncements(),
+      _loadDownloads(),
     ]);
   }
 
@@ -1048,12 +1063,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _showDownloadedContentSheet() {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Padding(
+        return Container(
           padding: const EdgeInsets.all(24),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1066,26 +1085,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              Icon(Icons.download_done_rounded,
-                  size: 48, color: AlsColors.primary),
-              const SizedBox(height: 16),
-              Text('Downloaded Content',
-                  style: Theme.of(ctx).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(
-                'Offline lesson download will be available in a future update. '
-                'Use "Sync" to keep your course list up to date.',
-                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                      color: AlsColors.textSecondary,
-                    ),
-                textAlign: TextAlign.center,
+              Row(
+                children: [
+                  Icon(Icons.download_done_rounded, color: AlsColors.primary),
+                  const SizedBox(width: 12),
+                  Text('Downloaded Content',
+                      style: Theme.of(ctx).textTheme.titleLarge),
+                ],
               ),
+              const SizedBox(height: 16),
+              if (_downloads.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: [
+                      Icon(Icons.cloud_off, size: 48, color: AlsColors.textHint),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No offline content yet.\nDownload lessons to study without internet.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AlsColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _downloads.length,
+                    itemBuilder: (context, index) {
+                      final d = _downloads[index];
+                      return ListTile(
+                        leading: Icon(
+                          d.status == DownloadStatus.completed
+                              ? Icons.check_circle
+                              : Icons.downloading,
+                          color: d.status == DownloadStatus.completed
+                              ? AlsColors.success
+                              : AlsColors.secondary,
+                        ),
+                        title: Text('Lesson ID: ${d.lessonId}'),
+                        subtitle: LinearProgressIndicator(
+                          value: d.downloadProgress,
+                          backgroundColor: AlsColors.divider,
+                          color: AlsColors.secondary,
+                        ),
+                        trailing: Text('${(d.downloadProgress * 100).toInt()}%'),
+                      );
+                    },
+                  ),
+                ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Got it'),
+                  child: const Text('Close'),
                 ),
               ),
             ],

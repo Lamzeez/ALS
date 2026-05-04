@@ -7,21 +7,24 @@ import 'package:shared_models/shared_models.dart';
 import 'supabase_client.dart';
 
 class AuthService {
-  supa.SupabaseClient get _client => SupabaseConfig.client;
+  supa.SupabaseClient? get _client => SupabaseConfig.safeClient;
 
-  supa.Session? get currentSession => _client.auth.currentSession;
-  supa.User? get currentUser => _client.auth.currentUser;
+  supa.Session? get currentSession => _client?.auth.currentSession;
+  supa.User? get currentUser => _client?.auth.currentUser;
 
   bool get isLoggedIn => currentSession != null;
 
-  Stream<supa.AuthState> get onAuthStateChange =>
-      _client.auth.onAuthStateChange;
+  Stream<supa.AuthState>? get onAuthStateChange =>
+      _client?.auth.onAuthStateChange;
 
   /// 🔍 Get current user profile with retry and proper error handling
   Future<Profile?> getCurrentProfile() async {
+    final client = _client;
+    if (client == null) return null;
+
     return SupabaseConfig.withRetry(
       () async {
-        final uid = _client.auth.currentUser?.id;
+        final uid = client.auth.currentUser?.id;
         if (uid == null) {
           throw SupabaseApiException(
             'User session not found',
@@ -32,7 +35,7 @@ class AuthService {
 
         // Table is 'profiles' in Supabase
         final data =
-            await _client.from('profiles').select('*').eq('id', uid).maybeSingle();
+            await client.from('profiles').select('*').eq('id', uid).maybeSingle();
 
         if (data == null) return null;
 
@@ -47,13 +50,18 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    final client = _client;
+    if (client == null) {
+      throw SupabaseApiException('Supabase is not initialized. Cannot sign in.');
+    }
+
     await SupabaseConfig.withRetry(
       () async {
         if (email.trim().isEmpty || password.trim().isEmpty) {
           throw SupabaseApiException('Email and password are required');
         }
 
-        final response = await _client.auth.signInWithPassword(
+        final response = await client.auth.signInWithPassword(
           email: email.trim(),
           password: password,
         );
@@ -77,6 +85,11 @@ class AuthService {
 
   /// 🌎 Native Google Sign-In for mobile (ID Token flow) with deep diagnostics
   Future<void> signInWithGoogle() async {
+    final client = _client;
+    if (client == null) {
+      throw SupabaseApiException('Supabase is not initialized. Cannot sign in.');
+    }
+
     try {
       print('[ALS-AUTH] Initiating Native Google Sign-In...');
       final GoogleSignIn googleSignIn = GoogleSignIn(
@@ -102,7 +115,7 @@ class AuthService {
       }
 
       print('[ALS-AUTH] Tokens received. Sending to Supabase...');
-      await _client.auth.signInWithIdToken(
+      await client.auth.signInWithIdToken(
         provider: supa.OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
@@ -139,12 +152,17 @@ class AuthService {
     String? lastYearAttended,
     String? centerLocation,
   }) async {
+    final client = _client;
+    if (client == null) {
+      throw SupabaseApiException('Supabase is not initialized. Cannot sign up.');
+    }
+
     final roleStr = role is UserRole
         ? role.toJson()
         : (role?.toString() ?? UserRole.student.toJson());
 
     // CRITICAL: Pass all data in metadata so the DB trigger can populate public.profiles
-    final response = await _client.auth.signUp(
+    final response = await client.auth.signUp(
       email: email,
       password: password,
       data: {
@@ -170,14 +188,14 @@ class AuthService {
       // but students/teachers have own_insert policies.
       try {
         if (roleStr == 'student') {
-          await _client.from('students').upsert({
+          await client.from('students').upsert({
             'user_id': user.id,
             'student_id_number': studentId,
             'als_center_id': centerLocation,
             'date_of_birth': birthDate,
           });
         } else if (roleStr == 'teacher') {
-          await _client.from('teachers').upsert({
+          await client.from('teachers').upsert({
             'user_id': user.id,
             'employee_id': empId,
             'als_center_id': centerLocation,
@@ -198,7 +216,10 @@ class AuthService {
     String? empId,
     String? alsCenterId,
   }) async {
-    final user = _client.auth.currentUser;
+    final client = _client;
+    if (client == null) return;
+    
+    final user = client.auth.currentUser;
     if (user == null) return;
 
     final uid = user.id;
@@ -206,7 +227,7 @@ class AuthService {
     final approvalStatus = role == UserRole.teacher ? 'pending' : 'approved';
 
     // Table is 'profiles', columns are snake_case to match migrations
-    await _client.from('profiles').upsert({
+    await client.from('profiles').upsert({
       'id': uid,
       'full_name': metadata['full_name'] ?? metadata['name'] ?? 'User',
       'email': user.email,
@@ -226,9 +247,12 @@ class AuthService {
     required List<int> fileBytes,
     required String mimeType,
   }) async {
+    final client = _client;
+    if (client == null) throw SupabaseApiException('Supabase not initialized');
+
     final path = '$uid/avatar.jpg';
     // Bucket is 'profile-pictures' as per migrations
-    await _client.storage.from('profile-pictures').uploadBinary(
+    await client.storage.from('profile-pictures').uploadBinary(
           path,
           fileBytes as Uint8List,
           fileOptions: supa.FileOptions(
@@ -236,18 +260,21 @@ class AuthService {
             upsert: true,
           ),
         );
-    final url = _client.storage.from('profile-pictures').getPublicUrl(path);
-    await _client.from('profiles').update({'profile_picture_url': url}).eq('id', uid);
+    final url = client.storage.from('profile-pictures').getPublicUrl(path);
+    await client.from('profiles').update({'profile_picture_url': url}).eq('id', uid);
     return url;
   }
 
   /// 📝 Sign out user with proper cleanup and error handling
   Future<void> signOut() async {
+    final client = _client;
+    if (client == null) return;
+
     await SupabaseConfig.withRetry(
       () async {
-        final userId = _client.auth.currentUser?.id;
+        final userId = client.auth.currentUser?.id;
 
-        await _client.auth.signOut();
+        await client.auth.signOut();
 
         developer.log('User signed out successfully: $userId',
             name: 'AuthService');
@@ -259,9 +286,12 @@ class AuthService {
 
   /// 📝 Update user profile with validation
   Future<void> updateProfile({required String fullName, String? studentIdNumber}) async {
+    final client = _client;
+    if (client == null) return;
+
     await SupabaseConfig.withRetry(
       () async {
-        final uid = _client.auth.currentUser?.id;
+        final uid = client.auth.currentUser?.id;
         if (uid == null) {
           throw SupabaseApiException(
             'User not authenticated',
@@ -283,7 +313,7 @@ class AuthService {
           updateData['student_id_number'] = studentIdNumber.trim();
         }
 
-        await _client.from('profiles').update(updateData).eq('id', uid);
+        await client.from('profiles').update(updateData).eq('id', uid);
 
         developer.log('Profile updated successfully', name: 'AuthService');
       },
@@ -293,6 +323,9 @@ class AuthService {
 
   /// 🔐 Update user password with proper validation
   Future<void> updatePassword(String newPassword) async {
+    final client = _client;
+    if (client == null) return;
+
     await SupabaseConfig.withRetry(
       () async {
         if (newPassword.length < 6) {
@@ -300,7 +333,7 @@ class AuthService {
               'Password must be at least 6 characters long');
         }
 
-        await _client.auth
+        await client.auth
             .updateUser(supa.UserAttributes(password: newPassword));
 
         developer.log('Password updated successfully', name: 'AuthService');

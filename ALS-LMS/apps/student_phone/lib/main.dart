@@ -2,12 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_services/shared_services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'app/app.dart';
 import 'app/bloc_observer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables before any service initialization
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('[ALS] .env load failed: $e');
+  }
 
   // Lock to portrait mode for phone
   await SystemChrome.setPreferredOrientations([

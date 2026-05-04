@@ -243,6 +243,18 @@ enum SubmissionStatus {
       .firstWhere((e) => e.name == value, orElse: () => SubmissionStatus.draft);
 }
 
+enum SessionStatus {
+  scheduled,
+  live,
+  completed,
+  cancelled;
+
+  String toJson() => name;
+  static SessionStatus fromJson(String value) =>
+      SessionStatus.values.firstWhere((e) => e.name == value,
+          orElse: () => SessionStatus.scheduled);
+}
+
 enum EnrollmentMethod {
   qrCode,
   pin,

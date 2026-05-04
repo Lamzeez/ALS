@@ -18,6 +18,8 @@ export 'src/realtime_service.dart';
 // Business Logic Services
 export 'src/course_service.dart';
 export 'src/announcement_service.dart';
+export 'src/session_service.dart';
+export 'src/downloads_service.dart';
 export 'src/center_service.dart';
 export 'src/system_service.dart';
 export 'src/media_service.dart';

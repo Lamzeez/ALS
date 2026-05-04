@@ -1,0 +1,74 @@
+  Step 1: Environment Setup
+  You must have a .env file in the root of the project.
+   1. Create a file named .env (based on the .env.example I created).
+   2. Fill in your SUPABASE_URL and SUPABASE_ANON_KEY.
+
+  ---
+
+  Step 2: Start the Applications
+
+
+  For Web Roles (Dev Admin, Center Admin, Teacher)
+  Open your terminal and run the Admin portal in Chrome:
+   1 cd ALS-LMS/apps/admin_web
+   2 flutter run -d chrome
+  Tip: Open 3 different Incognito windows if you want to be logged into all three web roles at once.
+
+
+  For Mobile Roles (Student, Teacher)
+  Connect an Android/iOS emulator or physical device:
+
+
+   1 cd ALS-LMS/apps/student_phone
+   2 flutter run
+
+  ---
+
+
+  Step 3: Creating Test Users
+  Since you are starting fresh, you need to create the users in Supabase.
+
+
+   1. Register: Use the Sign-Up screen in the apps to create 4 accounts with different emails.
+   2. Assign Roles: By default, new users are students. You must manually change their roles in the Supabase Dashboard
+      (SQL Editor) to test the others:
+
+
+   1     -- Example: Set a user as Dev Admin
+   2     update profiles set role = 'dev_admin' where email = 'your-admin@email.com';
+   3
+   4     -- Example: Set a user as Teacher
+   5     update profiles set role = 'teacher' where email = 'your-teacher@email.com';
+
+  ---
+
+  Step 4: The "Full Lifecycle" Test Flow
+
+
+  Follow this path to see how the users interact:
+
+
+   1. Dev Admin (Web):
+       * Log in and verify you see the Global Overview.
+       * Check if the Kill Switch works (it should block the mobile apps).
+   2. ALS Center Admin (Web):
+       * Log in and create a Learning Center (e.g., "Manila South ALS Center").
+       * Assign your Teacher account to that center.
+   3. Teacher (Web):
+       * Log in to the Web Portal.
+       * Create a Course and add a Lesson with a PDF or Video.
+   4. Teacher (Mobile):
+       * Log in to the Mobile App.
+       * Go to the Sessions tab and schedule a "Monday Morning Review" for next week.
+   5. Student (Mobile):
+       * Log in to the Mobile App.
+       * Verify you can see the Lesson created by the teacher.
+       * Check the Sessions/Calendar to see the "Monday Morning Review" the teacher just scheduled.
+       * Offline Test: Turn off your Wi-Fi, take a quiz, and then turn Wi-Fi back on to see it Sync to the Supabase
+         dashboard.
+
+
+  Quick Checklist for Success:
+   * Web Testing: Use F12 in Chrome to toggle "Device Mode" to see how the Teacher portal looks on a tablet vs. desktop.
+   * Logs: Watch your terminal output; I added debugPrint statements so you can see when data is being synced or if the
+     .env fails to load.

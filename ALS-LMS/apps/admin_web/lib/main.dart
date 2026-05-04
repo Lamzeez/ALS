@@ -4,14 +4,16 @@ import 'package:shared_ui/shared_ui.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
+    await dotenv.load(fileName: ".env");
     await SupabaseConfig.initialize();
   } catch (e) {
-    debugPrint('[Admin] Supabase init failed: $e');
+    debugPrint('[Admin] Initialization failed: $e');
   }
   runApp(const AlsAdminApp());
 }
@@ -49,12 +51,21 @@ class _AdminAuthGateState extends State<AdminAuthGate> {
   }
 
   Future<void> _checkAuth() async {
-    final profile = await AuthService().getCurrentProfile();
-    if (mounted) {
-      setState(() {
-        _profile = profile;
-        _checking = false;
-      });
+    try {
+      final profile = await AuthService().getCurrentProfile();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _checking = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _profile = null;
+          _checking = false;
+        });
+      }
     }
   }
 
@@ -235,6 +246,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _NavItem(Icons.storage_rounded, 'Database'),
         _NavItem(Icons.settings_rounded, 'System Settings'),
       ];
+    } else if (currentView == UserRole.teacher) {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Teacher Overview'),
+        _NavItem(Icons.school_rounded, 'My Courses'),
+        _NavItem(Icons.event_note_rounded, 'My Sessions'),
+        _NavItem(Icons.people_rounded, 'Student Reports'),
+        _NavItem(Icons.campaign_rounded, 'My Announcements'),
+      ];
     } else {
       return [
         _NavItem(Icons.dashboard_rounded, 'Overview'),
@@ -310,12 +329,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     switch (navLabel) {
       case 'Overview':
+      case 'Teacher Overview':
         return currentView == UserRole.devAdmin
             ? _buildDevOverview()
-            : _buildSchoolOverview();
+            : currentView == UserRole.teacher
+                ? _buildTeacherOverview()
+                : _buildSchoolOverview();
       case 'User Management':
       case 'Users':
         return _buildUserManagement();
+      case 'My Courses':
+        return _buildTeacherCourses();
+      case 'My Sessions':
+        return _buildTeacherSessions();
+      case 'Student Reports':
+        return _buildStudentReports();
       case 'System Controls':
         return _buildSystemControls();
       case 'Activity Logs':
@@ -337,6 +365,117 @@ class _AdminDashboardState extends State<AdminDashboard> {
       default:
         return _buildDevOverview();
     }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // PAGE: Teacher Overview
+  // ────────────────────────────────────────────────────────────
+  Widget _buildTeacherOverview() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _buildMetricCard(
+              'My Courses',
+              '$_totalCourses',
+              Icons.menu_book,
+              AlsColors.primary,
+            ),
+            _buildMetricCard(
+              'Assigned Students',
+              '$_totalStudents',
+              Icons.people,
+              AlsColors.strandCommunication,
+            ),
+            _buildMetricCard(
+              'Upcoming Sessions',
+              '3', // TODO: Pull real count from SessionService
+              Icons.event,
+              AlsColors.warning,
+            ),
+            _buildMetricCard(
+              'Avg Class Mastery',
+              '$_avgMastery%',
+              Icons.trending_up,
+              AlsColors.success,
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        Text('Quick Actions', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildQuickAction(
+              'Create New Lesson',
+              Icons.add_circle_outline,
+              AlsColors.primary,
+              () => _selectedNavIndex = 1, // Go to My Courses
+            ),
+            const SizedBox(width: 12),
+            _buildQuickAction(
+              'Schedule a Session',
+              Icons.calendar_today,
+              AlsColors.secondary,
+              () => _selectedNavIndex = 2, // Go to My Sessions
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeacherCourses() {
+    // For teachers, we reuse _buildCoursesPage but eventually we'll filter it
+    return _buildCoursesPage();
+  }
+
+  Widget _buildTeacherSessions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Scheduled Sessions',
+                style: Theme.of(context).textTheme.titleMedium),
+            ElevatedButton.icon(
+              onPressed: () {
+                // TODO: Implement Session creation dialog for web
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content:
+                          Text('Please use the mobile app to manage sessions.')),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('New Session'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildEmptyState('No sessions found for your account.'),
+      ],
+    );
+  }
+
+  Widget _buildStudentReports() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Student Progress Reports',
+            style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 16),
+        _buildDataTable(
+          ['Student Name', 'Course', 'Progress', 'Last Activity'],
+          [
+            ['Juan Dela Cruz', 'Basic Literacy', '85%', '2 hours ago'],
+            ['Maria Santos', 'Digital Literacy', '45%', 'Yesterday'],
+          ],
+        ),
+      ],
+    );
   }
 
   // ── Sidebar Components ──
@@ -553,7 +692,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ),
           Text(
-            currentView == UserRole.devAdmin ? 'Dev Admin' : 'School Admin',
+            currentView == UserRole.devAdmin
+                ? 'Dev Admin'
+                : currentView == UserRole.teacher
+                    ? 'Teacher Portal'
+                    : 'School Admin',
             style: TextStyle(color: AlsColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(width: 12),
@@ -2210,7 +2353,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         itemCount: teachers.length,
                         itemBuilder: (context, index) {
                           final t = teachers[index];
-                          final profile = t; // Each row is already a user map from getCenterTeachers()                          return ListTile(
+                          final profile = t; // Each row is already a user map from getCenterTeachers()
+                          return ListTile(
                             leading: const CircleAvatar(
                               child: Icon(Icons.person),
                             ),

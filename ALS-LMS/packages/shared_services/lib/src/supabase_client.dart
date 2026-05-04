@@ -1,33 +1,51 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SupabaseConfig {
-  static const String _url = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://trixvamgvaihvuqpyjwc.supabase.co',
-  );
-  static const String _anonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyaXh2YW1ndmFpaHZ1cXB5andjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNzU3MDUsImV4cCI6MjA5MTc1MTcwNX0.FgJpB5VvimONIS11L1_LvB-G-5M4S7l8xPS2O2w4F5s',
-  );
+  static bool _isInitialized = false;
+
+  static String get _url => dotenv.get('SUPABASE_URL',
+      fallback: const String.fromEnvironment('SUPABASE_URL'));
+
+  static String get _anonKey => dotenv.get('SUPABASE_ANON_KEY',
+      fallback: const String.fromEnvironment('SUPABASE_ANON_KEY'));
 
   // 🚀 API Configuration
   static const Duration _defaultTimeout = Duration(seconds: 30);
   static const Duration _longTimeout = Duration(minutes: 2); // For uploads
   static const int _maxRetries = 3;
 
+  static bool get isInitialized => _isInitialized;
+
   static Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    final url = _url;
+    final anonKey = _anonKey;
+
+    if (url.isEmpty || anonKey.isEmpty) {
+      developer.log(
+        'Supabase URL or Anon Key is missing! Ensure .env is loaded or --dart-define is used.',
+        name: 'SupabaseConfig',
+        level: 1000,
+      );
+      _isInitialized = false;
+      return;
+    }
+
     try {
       await Supabase.initialize(
-        url: _url,
-        anonKey: _anonKey,
+        url: url,
+        anonKey: anonKey,
         debug: false, // Set to true only in development
       );
+      _isInitialized = true;
       developer.log('Supabase initialized successfully',
           name: 'SupabaseConfig');
     } catch (e, stackTrace) {
+      _isInitialized = false;
       developer.log('Supabase initialization failed',
           error: e,
           stackTrace: stackTrace,
@@ -38,6 +56,10 @@ class SupabaseConfig {
   }
 
   static SupabaseClient get client => Supabase.instance.client;
+
+  /// Returns the client only if initialized, otherwise null.
+  /// Use this to avoid "Supabase must be initialized" assertion errors.
+  static SupabaseClient? get safeClient => _isInitialized ? Supabase.instance.client : null;
 
   /// 🔄 Execute API call with timeout and retry logic
   static Future<T> withRetry<T>(

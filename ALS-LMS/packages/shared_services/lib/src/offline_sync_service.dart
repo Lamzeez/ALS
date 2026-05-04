@@ -54,10 +54,15 @@ class OfflineSyncService {
   /// Sync all pending local changes to Supabase
   Future<void> syncToCloud() async {
     if (_isSyncing || !_isOnline) return;
+    
+    final client = SupabaseConfig.safeClient;
+    if (client == null) {
+      developer.log('Skipping sync: Supabase not initialized.', name: 'OfflineSync');
+      return;
+    }
 
     _isSyncing = true;
     try {
-      final client = SupabaseConfig.client;
       final pendingOps = await _syncQueue.getPendingOperations();
 
       if (pendingOps.isEmpty) {
