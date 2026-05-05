@@ -98,7 +98,7 @@ The `.env` files are **gitignored** (never pushed to GitHub for security). You m
 
 Send your friend **both** of these `.env` file contents:
 
-**For `student_phone` and `admin_web` (same values)**:
+**For `mobile_app` and `admin_web` (same values)**:
 ```env
 SUPABASE_URL=https://trixvamgvaihvuqpyjwc.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyaXh2YW1ndmFpaHZ1cXB5andjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNzU3MDUsImV4cCI6MjA5MTc1MTcwNX0.FgJpB5VvimONIS11L1_LvB-G-5M4S7l8xPS2O2w4F5s
@@ -168,8 +168,8 @@ If prompted for credentials, use GitHub username + Personal Access Token.
 The `.env` files are not included in the repo (gitignored). Create them manually using the values shared securely.
 
 ```powershell
-# Create .env for student_phone
-New-Item -Path "ALS-LMS\apps\student_phone\.env" -ItemType File -Force
+# Create .env for mobile_app
+New-Item -Path "ALS-LMS\apps\mobile_app\.env" -ItemType File -Force
 ```
 
 Then open the file and paste:
@@ -192,12 +192,12 @@ Same content in `admin_web/.env`.
 Run `flutter pub get` in each package and app, **in this exact order** (packages first, apps second):
 
 ```powershell
-# 1. shared_models (no deps — must be first)
-cd ALS-LMS\packages\shared_models
+# 1. shared_core (no deps — must be first)
+cd ALS-LMS\packages\shared_core
 flutter pub get
 
-# 2. shared_services (depends on shared_models)
-cd ..\shared_services
+# 2. backend_services (depends on shared_core)
+cd ..\backend_services
 flutter pub get
 
 # 3. shared_ui
@@ -208,13 +208,13 @@ flutter pub get
 cd ..\..\apps\admin_web
 flutter pub get
 
-# 5. student_phone app
-cd ..\student_phone
+# 5. mobile_app app
+cd ..\mobile_app
 flutter pub get
 ```
 
 > [!IMPORTANT]
-> Order matters. `shared_models` must be resolved before `shared_services`, and both before the apps — otherwise local path dependencies won't resolve correctly.
+> Order matters. `shared_core` must be resolved before `backend_services`, and both before the apps — otherwise local path dependencies won't resolve correctly.
 
 ---
 
@@ -230,12 +230,12 @@ This installs the Supabase CLI and JS dependencies defined in `package.json`.
 
 ---
 
-### Step 6 — Android Setup for `student_phone`
+### Step 6 — Android Setup for `mobile_app`
 
 #### 6a. Open in Android Studio
 
 1. Open **Android Studio**
-2. Click **Open** → navigate to `ALS-LMS/apps/student_phone`
+2. Click **Open** → navigate to `ALS-LMS/apps/mobile_app`
 3. Let Gradle sync complete (first time may take a few minutes)
 
 #### 6b. Set Up an Android Emulator (if no physical device)
@@ -269,10 +269,10 @@ OR add it yourself if you have access to the Google Cloud Console project:
 
 ### Step 7 — Run the Apps
 
-#### Run `student_phone` (Mobile)
+#### Run `mobile_app` (Mobile)
 
 ```powershell
-cd ALS-LMS\apps\student_phone
+cd ALS-LMS\apps\mobile_app
 
 # List available devices
 flutter devices
@@ -307,7 +307,7 @@ After the apps launch, verify:
 
 | Check | Expected Result |
 |---|---|
-| `student_phone` loads | Role selection screen (Student / Teacher) appears |
+| `mobile_app` loads | Role selection screen (Student / Teacher) appears |
 | `admin_web` loads | Admin login page appears |
 | Register a test student | Goes through email verification flow |
 | Admin login | Dashboard shows metrics (may be 0 on fresh setup) |

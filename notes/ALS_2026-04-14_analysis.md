@@ -54,8 +54,8 @@ The backend is powered by **Supabase** (PostgreSQL + Auth + Storage), providing 
             │                             │
             │         Shared Packages     │
             ├─────────────────────────────┤
-            │  • shared_models            │
-            │  • shared_services          │
+            │  • shared_core            │
+            │  • backend_services          │
             │  • shared_ui                │
             └─────────────┬───────────────┘
                           │
@@ -75,16 +75,16 @@ The backend is powered by **Supabase** (PostgreSQL + Auth + Storage), providing 
 ### Dependency Flow
 
 ```
-shared_models (pure Dart, no Flutter deps)
+shared_core (pure Dart, no Flutter deps)
       ▲
       │
-shared_services (depends on shared_models + supabase_flutter)
+backend_services (depends on shared_core + supabase_flutter)
       ▲
       │
-shared_ui (depends on shared_models + google_fonts)
+shared_ui (depends on shared_core + google_fonts)
       ▲
       ├──────────────┐
-admin_web         student_phone
+admin_web         mobile_app
 ```
 
 ---
@@ -179,7 +179,7 @@ emerging-tech-Als-LMS/
 │   │   │   ├── pubspec.yaml              ← Dependencies
 │   │   │   └── analysis_options.yaml     ← Linting rules
 │   │   │
-│   │   └── student_phone/                ← Student mobile app
+│   │   └── mobile_app/                ← Student mobile app
 │   │       ├── lib/
 │   │       │   ├── main.dart             ← App entry point
 │   │       │   ├── app/                  ← App configuration, BLoC observer
@@ -200,11 +200,11 @@ emerging-tech-Als-LMS/
 │   │       └── analysis_options.yaml     ← Linting rules
 │   │
 │   └── packages/
-│       ├── shared_models/                ← Data models (pure Dart)
+│       ├── shared_core/                ← Data models (pure Dart)
 │       │   ├── lib/
 │       │   └── pubspec.yaml
 │       │
-│       ├── shared_services/              ← Service layer (Supabase, Auth, Sync)
+│       ├── backend_services/              ← Service layer (Supabase, Auth, Sync)
 │       │   ├── lib/
 │       │   └── pubspec.yaml
 │       │
@@ -428,9 +428,9 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key-here
 ```
 
-**For student_phone:**
+**For mobile_app:**
 ```bash
-cd ALS-LMS\apps\student_phone
+cd ALS-LMS\apps\mobile_app
 # Create a new file called .env (DO NOT commit this)
 ```
 
@@ -447,12 +447,12 @@ SUPABASE_ANON_KEY=your-anon-key-here
 Install dependencies for each package (run from repository root):
 
 ```bash
-# Install shared_models
-cd ALS-LMS\packages\shared_models
+# Install shared_core
+cd ALS-LMS\packages\shared_core
 flutter pub get
 
-# Install shared_services
-cd ..\shared_services
+# Install backend_services
+cd ..\backend_services
 flutter pub get
 
 # Install shared_ui
@@ -463,8 +463,8 @@ flutter pub get
 cd ..\..\apps\admin_web
 flutter pub get
 
-# Install student_phone
-cd ..\student_phone
+# Install mobile_app
+cd ..\mobile_app
 flutter pub get
 ```
 
@@ -481,7 +481,7 @@ Run the analyzer to check for issues:
 cd ALS-LMS\apps\admin_web
 flutter analyze
 
-cd ..\student_phone
+cd ..\mobile_app
 flutter analyze
 ```
 
@@ -516,7 +516,7 @@ The admin web app will open in your browser at `http://localhost:XXXX` (port sho
 2. Open AVD Manager and create/start an emulator
 3. In terminal:
    ```bash
-   cd ALS-LMS\apps\student_phone
+   cd ALS-LMS\apps\mobile_app
    flutter run
    ```
 
@@ -527,7 +527,7 @@ The admin web app will open in your browser at `http://localhost:XXXX` (port sho
 3. Connect via USB
 4. Run:
    ```bash
-   cd ALS-LMS\apps\student_phone
+   cd ALS-LMS\apps\mobile_app
    flutter devices  # Verify device detected
    flutter run
    ```
@@ -535,7 +535,7 @@ The admin web app will open in your browser at `http://localhost:XXXX` (port sho
 **Option C: iOS Simulator (macOS only)**
 
 ```bash
-cd ALS-LMS\apps\student_phone
+cd ALS-LMS\apps\mobile_app
 flutter run -d iphone
 ```
 
@@ -559,7 +559,7 @@ While running, use these commands:
 cd ALS-LMS\apps\admin_web
 flutter test
 
-cd ..\student_phone
+cd ..\mobile_app
 flutter test
 ```
 
@@ -587,8 +587,8 @@ From `DEPENDENCIES.md` audit (March 8, 2026):
    - CI workflow references old paths that may not work
 
 2. **Missing Package**: 
-   - README mentions `mobile_app` but actual directory is `student_phone`
-   - README mentions `backend_services` but structure shows `shared_services`
+   - README mentions `mobile_app` but actual directory is `mobile_app`
+   - README mentions `backend_services` but structure shows `backend_services`
 
 3. **Environment Variables**: 
    - No `.env.example` files found in current structure
@@ -639,10 +639,10 @@ The extensive README describes features that may or may not be fully implemented
 
 4. **Run Code Generation**
    ```bash
-   cd ALS-LMS\apps\student_phone
+   cd ALS-LMS\apps\mobile_app
    flutter pub run build_runner build --delete-conflicting-outputs
    
-   cd ALS-LMS\packages\shared_models
+   cd ALS-LMS\packages\shared_core
    flutter pub run build_runner build --delete-conflicting-outputs
    ```
 
@@ -708,7 +708,7 @@ The extensive README describes features that may or may not be fully implemented
 4. ⏳ Create `.env` files with Supabase credentials
 5. ⏳ Run `flutter pub get` for all packages
 6. ⏳ Start admin web: `cd ALS-LMS\apps\admin_web && flutter run -d chrome`
-7. ⏳ Start student app: `cd ALS-LMS\apps\student_phone && flutter run`
+7. ⏳ Start student app: `cd ALS-LMS\apps\mobile_app && flutter run`
 8. ⏳ Explore both apps to understand current functionality
 
 ### For Contributing:
@@ -735,25 +735,25 @@ Get-ChildItem -Path "ALS-LMS\packages","ALS-LMS\apps" -Recurse -Filter "pubspec.
 cd ALS-LMS\apps\admin_web && flutter run -d chrome
 
 # Student Mobile
-cd ALS-LMS\apps\student_phone && flutter run
+cd ALS-LMS\apps\mobile_app && flutter run
 ```
 
 ### Code Generation
 ```bash
-cd ALS-LMS\apps\student_phone
+cd ALS-LMS\apps\mobile_app
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
 
 ### Testing
 ```bash
 cd ALS-LMS\apps\admin_web && flutter test
-cd ALS-LMS\apps\student_phone && flutter test
+cd ALS-LMS\apps\mobile_app && flutter test
 ```
 
 ### Analysis
 ```bash
 cd ALS-LMS\apps\admin_web && flutter analyze
-cd ALS-LMS\apps\student_phone && flutter analyze
+cd ALS-LMS\apps\mobile_app && flutter analyze
 ```
 
 ### Supabase (if running locally)

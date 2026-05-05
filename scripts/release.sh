@@ -7,22 +7,22 @@ echo "Release helper script"
 case "${1:-}" in
   android)
     echo "Building Android APK"
-    cd als_study_companion/mobile_app
+    cd ALS-LMS/apps/mobile_app
     flutter build apk --release
     ;;
   appbundle)
     echo "Building Android App Bundle"
-    cd als_study_companion/mobile_app
+    cd ALS-LMS/apps/mobile_app
     flutter build appbundle --release
     ;;
   ios)
     echo "Building iOS (requires macOS and signing configured)"
-    cd als_study_companion/mobile_app
+    cd ALS-LMS/apps/mobile_app
     flutter build ipa --release
     ;;
   web)
     echo "Building web"
-    cd als_study_companion/admin_web
+    cd ALS-LMS/apps/admin_web
     flutter build web --release
     ;;
   pub)

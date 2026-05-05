@@ -1,0 +1,10 @@
+Launching lib\main.dart on Chrome in debug mode...
+Error: unable to find directory entry in pubspec.yaml: D:\Documents\Studies\SY_2025-2026\SEM2\EmergingTech\ALS-Bondave\emerging-tech-Als-LMS\ALS-LMS\apps\center_portal\assets\images\
+lib/main.dart:94:9: Error: No named parameter with the name 'registrationRoute'.
+        registrationRoute: '/register', 
+        ^^^^^^^^^^^^^^^^^
+lib/login_screen.dart:8:9: Context: Found this candidate, but the arguments don't match.
+  const WebLoginScreen({super.key, required this.onLoginSuccess});
+        ^^^^^^^^^^^^^^
+Waiting for connection from debug service on Chrome...             23.3s
+Failed to compile application.

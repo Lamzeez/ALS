@@ -1,0 +1,55 @@
+Here is the implementation plan broken down into 5 phases:
+
+
+  Phase 1: Foundations (Renaming & Roles)
+  This phase ensures the core architecture is correctly named and user permissions are established.
+   1. Rename Directories & Packages:
+      - Rename apps/student_phone to apps/mobile_app.
+      - Rename packages/shared_models to packages/shared_core.
+      - Rename packages/shared_services to packages/backend_services.
+      - Update all pubspec.yaml files, imports, and references.
+   2. Update User Roles:
+      - Update the UserRole enum to include centerAdmin and systemAdmin (deprecating the generic admin).
+      - Run Supabase migrations to update the users table CHECK constraints, rename existing admins, and update the current_user_role() function and RLS policies.
+
+
+  Phase 2: Core New Tables & Models
+  This phase sets up the data structures required for the new features.
+   1. Supabase Migrations:
+      - Create tables: als_center_registrations, courses, course_enrollments, center_subjects, course_timeline, and certificates.
+      - Add new columns to als_centers and lessons.
+      - Implement the specified RLS policies.
+   2. Dart Models & Constants:
+      - Build Dart models for all new tables and update DbConstants.
+   3. Local Database & Sync:
+      - Update SQLite table creation for offline support.
+      - Update SyncViewModel and Drift SyncQueue for the new offline-first entities.
+   4. Backend Services:
+      - Implement the new CRUD methods in SupabaseDatabaseService and SupabaseStorageService.
+      - Create the qr-codes storage bucket.
+
+
+  Phase 3: ALS Center Registration (admin_web & public)
+  This phase builds the public school registration flow and the system admin approval queue.
+   1. Build the /register-center public route in admin_web.
+   2. Build the CenterRegistrationReviewPage for System Admins to approve/reject requests.
+   3. Implement the logic to automatically create a Center Admin account upon approval.
+   4. Update the mobile_app registration to only list approved centers.
+
+
+  Phase 4: Course System (mobile_app & admin_web)
+  This phase builds out the core learning experience for teachers and students.
+   1. Center Admin: Build the SubjectManagementPage in admin_web to manage Core Academic Subjects.
+   2. Teacher Flow: Build TeacherCourseCreateView (with automatic PIN generation and QR code upload) and TeacherCourseTimelineView.
+   3. Student Flow: Build StudentEnrollView (QR scanner and PIN entry), StudentCourseView (timeline and live progress), and StudentCertificateView.
+
+
+  Phase 5: Polish & Fixes
+   1. Fix the biometric setup UI flow.
+   2. Improve batch CSV import validation.
+   3. Refine storage policies for profile pictures.
+   4. Write integration and unit tests for the enrollment flow.
+
+
+  This approach ensures we build the foundation first, update the database schema, and then implement the UI layer
+  incrementally without breaking the app.

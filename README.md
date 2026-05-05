@@ -54,10 +54,10 @@ ALS Study Companion/
 ├── ALS-LMS/                      ← Monorepo Root
 │   ├── apps/
 │   │   ├── admin_web/            ← Flutter Web app (Admin portal)
-│   │   └── student_phone/        ← Flutter Mobile app (Student & Teacher)
+│   │   └── mobile_app/           ← Flutter Mobile app (Student & Teacher)
 │   ├── packages/
-│   │   ├── shared_models/        ← Unified data models (matching Supabase schema)
-│   │   ├── shared_services/      ← Core business logic (Auth, Supabase, Sync, Storage)
+│   │   ├── shared_core/          ← Unified data models (matching Supabase schema)
+│   │   ├── backend_services/     ← Core business logic (Auth, Supabase, Sync, Storage)
 │   │   └── shared_ui/            ← Reusable design system components
 ├── supabase/
 │   ├── config.toml
@@ -68,16 +68,16 @@ ALS Study Companion/
 ### Dependency Graph
 
 ```
-shared_models (no internal deps)
+shared_core (no internal deps)
      ▲
      │
-shared_services (depends on shared_models)
+backend_services (depends on shared_core)
      ▲
      ├──────────────┐
-admin_web         student_phone
+admin_web         mobile_app
 (depends on       (depends on
- shared_models +   shared_models +
- shared_services + shared_services +
+ shared_core +     shared_core +
+ backend_services + backend_services +
  shared_ui)        shared_ui)
 ```
 
@@ -972,18 +972,18 @@ intl: ^0.19.0
 # 1. Install Flutter SDK >= 3.22.0
 
 # 2. Install all package dependencies
-cd ALS-LMS/packages/shared_models && flutter pub get
-cd ../shared_services && flutter pub get
+cd ALS-LMS/packages/shared_core && flutter pub get
+cd ../backend_services && flutter pub get
 cd ../shared_ui && flutter pub get
 cd ../../apps/admin_web && flutter pub get
-cd ../student_phone && flutter pub get
+cd ../mobile_app && flutter pub get
 
 # 3. Configure environment
 cp .env.example .env
 # Fill in: SUPABASE_URL and SUPABASE_ANON_KEY
 
 # 4. Run mobile app
-cd ALS-LMS/apps/student_phone
+cd ALS-LMS/apps/mobile_app
 flutter run
 
 # 5. Run admin web

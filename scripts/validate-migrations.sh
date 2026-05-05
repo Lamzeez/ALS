@@ -2,9 +2,9 @@
 # Basic validation for SQL migration files.
 set -euo pipefail
 repo_root=$(dirname "${BASH_SOURCE[0]}")/..
-echo "Checking SQL migrations under supabase/migrations and als_study_companion/supabase/migrations"
+echo "Checking SQL migrations under supabase/migrations"      
 errors=0
-for file in $(find "$repo_root/supabase/migrations" "$repo_root/als_study_companion/supabase/migrations" -type f -name '*.sql' 2>/dev/null); do
+for file in $(find "$repo_root/supabase/migrations" -type f -name '*.sql' 2>/dev/null); do
   echo "- Checking $file"
   # Check for missing semicolons at end of file (very naive)
   last=$(tail -n 1 "$file" | tr -d '[:space:]')

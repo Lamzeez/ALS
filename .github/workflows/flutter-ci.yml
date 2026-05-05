@@ -27,7 +27,7 @@ jobs:
       - name: Run tests for packages
         run: |
           set -e
-          for pkg in als_study_companion als_study_companion/mobile_app als_study_companion/backend_services als_study_companion/shared_core als_study_companion/admin_web; do
+          for pkg in ALS-LMS/packages/shared_core ALS-LMS/packages/backend_services ALS-LMS/packages/shared_ui ALS-LMS/apps/mobile_app ALS-LMS/apps/admin_web; do
             if [ -d "$pkg" ]; then
               echo "-- package: $pkg --"
               cd $pkg

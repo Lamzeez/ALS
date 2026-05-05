@@ -11,7 +11,7 @@ An **offline-first Learning Management System (LMS)** for the Philippine ALS pro
 
 | App | Who Uses It | How to Run |
 |---|---|---|
-| `student_phone` | Students & Teachers | `flutter run` (Android/iOS) |
+| `mobile_app` | Students & Teachers | `flutter run` (Android/iOS) |
 | `admin_web` | Admins only | `flutter run -d chrome` |
 
 **Backend**: Supabase (cloud DB + auth + file storage)  
@@ -27,7 +27,7 @@ Use it to understand **what exists in the codebase** before you touch anything.
 |---|---|
 | §2 Tech Stack | Know what versions/libraries are in use |
 | §3 Architecture | Understand the folder structure and dependencies |
-| §4 Packages | Learn what `shared_models`, `shared_services`, `shared_ui` do |
+| §4 Packages | Learn what `shared_core`, `backend_services`, `shared_ui` do |
 | §5 Apps | See every screen, ViewModel, and feature in both apps |
 | §6 Database | Understand tables, triggers, RLS policies, and local SQLite |
 | §7 Sync System | Know how offline → online data sync works |
@@ -63,7 +63,7 @@ cd ALS-LMS
 
 **3. Create `.env` files** (ask the owner for the values)
 ```
-ALS-LMS/apps/student_phone/.env
+ALS-LMS/apps/mobile_app/.env
 ALS-LMS/apps/admin_web/.env
 ```
 Both files contain:
@@ -74,11 +74,11 @@ SUPABASE_ANON_KEY=<value from owner>
 
 **4. Install Flutter dependencies** — order matters!
 ```powershell
-cd ALS-LMS\packages\shared_models  && flutter pub get
-cd ..\shared_services               && flutter pub get
+cd ALS-LMS\packages\shared_core  && flutter pub get
+cd ..\backend_services               && flutter pub get
 cd ..\shared_ui                     && flutter pub get
 cd ..\..\apps\admin_web             && flutter pub get
-cd ..\student_phone                 && flutter pub get
+cd ..\mobile_app                 && flutter pub get
 ```
 
 **5. Install Node dependencies** (from repo root)
@@ -90,7 +90,7 @@ npm install
 **6. Run the apps**
 ```powershell
 # Mobile app (student & teacher)
-cd ALS-LMS\apps\student_phone
+cd ALS-LMS\apps\mobile_app
 flutter run
 
 # Admin web portal
@@ -270,7 +270,7 @@ npx supabase db push
 | Problem | Fix |
 |---|---|
 | `flutter pub get` path error | Run in the correct directory; packages before apps |
-| `.env` not found | Check the file exists in `apps/student_phone/` and `apps/admin_web/` |
+| `.env` not found | Check the file exists in `apps/mobile_app/` and `apps/admin_web/` |
 | Google Sign-In fails | Send your SHA-1 to the repo owner (see above) |
 | `flutter run -d chrome` fails | Run `flutter config --enable-web` first |
 | Git push asks for password | Use a GitHub Personal Access Token (PAT), not your account password |

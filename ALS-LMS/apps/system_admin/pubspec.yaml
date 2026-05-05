@@ -1,0 +1,46 @@
+name: system_portal
+description: ALS-LMS System Administrator Portal (Global Oversight + Security)
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # State Management
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.7
+
+  # Supabase & Auth
+  supabase_flutter: ^2.8.0
+  google_sign_in: ^6.2.2
+  flutter_dotenv: ^5.1.0
+
+  # UI Components
+  google_fonts: ^6.3.3
+  flutter_svg: ^2.2.4
+  cached_network_image: ^3.4.1
+  lucide_icons: ^0.257.0 
+  file_picker: ^8.1.3
+
+  # Local packages
+  shared_core:
+    path: ../../packages/shared_core
+  backend_services:
+    path: ../../packages/backend_services
+  shared_ui:
+    path: ../../packages/shared_ui
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/

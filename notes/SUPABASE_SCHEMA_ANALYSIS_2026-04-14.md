@@ -304,7 +304,7 @@ SELECT * FROM public.questions;
 Update all Dart code to use the table names from migrations:
 
 ```dart
-// Change these in shared_services:
+// Change these in backend_services:
 'profiles' → 'users'
 'quiz_questions' → 'questions'
 'learning_centers' → 'als_centers'
@@ -395,7 +395,7 @@ SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_ANON_KEY=YOUR_ANON_KEY_HERE
 ```
 
-**ALS-LMS/apps/student_phone/.env:**
+**ALS-LMS/apps/mobile_app/.env:**
 ```env
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_ANON_KEY=YOUR_ANON_KEY_HERE
@@ -432,7 +432,7 @@ After creating your Supabase project:
 - [ ] Test user registration (verify `handle_new_auth_user()` trigger fires)
 - [ ] Test RLS policies (create a test student user, try to access admin tables)
 - [ ] Update `.env` files with your credentials
-- [ ] Test app connectivity from both admin_web and student_phone
+- [ ] Test app connectivity from both admin_web and mobile_app
 
 ---
 

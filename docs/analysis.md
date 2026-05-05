@@ -12,7 +12,7 @@ The **ALS Study Companion** is a multi-platform, offline-first Learning Manageme
 
 | Platform | App | Audience |
 |---|---|---|
-| Flutter Mobile (Android/iOS) | `student_phone` | Students & Teachers |
+| Flutter Mobile (Android/iOS) | `mobile_app` | Students & Teachers |
 | Flutter Web | `admin_web` | Administrators |
 
 **Core philosophy**: Works completely offline first (SQLite local cache), syncs to the cloud (Supabase) when internet is restored.
@@ -24,7 +24,7 @@ The **ALS Study Companion** is a multi-platform, offline-first Learning Manageme
 | Layer | Technology | Version |
 |---|---|---|
 | **Frontend Framework** | Flutter / Dart | SDK ≥ 3.5.0 |
-| **State Management** | `flutter_bloc` (student_phone), `ChangeNotifier` / Provider (admin_web) | BLoC ^8.1.6 |
+| **State Management** | `flutter_bloc` (mobile_app), `ChangeNotifier` / Provider (admin_web) | BLoC ^8.1.6 |
 | **Backend / Auth / DB** | Supabase (PostgreSQL + Auth + Storage) | supabase_flutter ^2.8.0 |
 | **Local Storage (primary)** | SQLite via `sqflite` | ^2.4.1 |
 | **Local Storage (auth cache/sync queue)** | Drift ORM | ^2.16.0 |
@@ -42,10 +42,10 @@ emerging-tech-Als-LMS/           ← Git root
 ├── ALS-LMS/
 │   ├── apps/
 │   │   ├── admin_web/           ← Flutter Web (Admin portal)
-│   │   └── student_phone/       ← Flutter Mobile (Students & Teachers)
+│   │   └── mobile_app/          ← Flutter Mobile (Students & Teachers)
 │   └── packages/
-│       ├── shared_models/       ← Pure Dart: data models, enums, utils
-│       ├── shared_services/     ← Flutter: Supabase service wrappers
+│       ├── shared_core/         ← Pure Dart: data models, enums, utils
+│       ├── backend_services/    ← Flutter: Supabase service wrappers
 │       └── shared_ui/           ← Shared UI components
 ├── supabase/
 │   ├── config.toml
@@ -60,13 +60,13 @@ emerging-tech-Als-LMS/           ← Git root
 ### Dependency Graph
 
 ```
-shared_models  (no external deps)
+shared_core  (no external deps)
      ▲
      │
-shared_services  (depends on shared_models + supabase_flutter)
+backend_services  (depends on shared_core + supabase_flutter)
      ▲
      ├─────────────────┐
-admin_web          student_phone
+admin_web          mobile_app
 (web browser)      (Android/iOS)
 ```
 
@@ -84,7 +84,7 @@ admin_web          student_phone
 
 ## 4. Packages Deep Dive
 
-### 4.1 `shared_models` — Pure Dart Library
+### 4.1 `shared_core` — Pure Dart Library
 Single source of truth for all data structures shared across both apps.
 
 **11 Models**: `UserModel`, `LessonModel`, `QuizModel`, `QuestionModel`, `ProgressModel`, `StudentModel`, `TeacherModel`, `AlsCenterModel`, `SessionModel`, `AnnouncementModel`, `DownloadModel`
@@ -95,7 +95,7 @@ Single source of truth for all data structures shared across both apps.
 
 All models implement `fromMap()`, `toMap()`, and `copyWith()` — handling both `snake_case` (Supabase) and `camelCase` (SQLite legacy) key naming.
 
-### 4.2 `shared_services` — Flutter Library
+### 4.2 `backend_services` — Flutter Library
 Reusable Supabase service layer:
 
 | Service | Responsibility |
@@ -128,9 +128,9 @@ Shared UI components used across both apps.
 
 **5 ViewModels**: `AdminAuthViewModel`, `AnalyticsViewModel`, `CenterManagementViewModel`, `ContentManagementViewModel`, `UserManagementViewModel`
 
-> **Note**: The admin web app has the Supabase anon key hardcoded in `main.dart` (Known Issue #9). It should be moved to `.env` like `student_phone` does.
+> **Note**: The admin web app has the Supabase anon key hardcoded in `main.dart` (Known Issue #9). It should be moved to `.env` like `mobile_app` does.
 
-### 5.2 `student_phone` — Flutter Mobile App
+### 5.2 `mobile_app` — Flutter Mobile App
 
 **Auth**: Email+password, Google Sign-In, Biometric (fingerprint/Face ID).
 
@@ -255,7 +255,7 @@ Biometric Login     → SecureStorage credentials → signIn()
 | 6 | `TeacherLessonCreateView` | `teacherId: ''` is hardcoded — should pull from `AuthViewModel.currentUser.id` |
 | 7 | `QuizCreatorRepository` | Uses `camelCase` columns inconsistently with `TeacherLessonRepository` (uses `snake_case`) |
 | 8 | `StudentMonitorRepository` | Supabase queries use `camelCase` — may break against cloud data (expects `snake_case`) |
-| 9 | `admin_web/main.dart` | Supabase anon key hardcoded — should use `.env` file like `student_phone` |
+| 9 | `admin_web/main.dart` | Supabase anon key hardcoded — should use `.env` file like `mobile_app` |
 | 10 | Migrations | Duplicate-risk migrations from 2026-03-11 — apply with caution |
 
 ---
