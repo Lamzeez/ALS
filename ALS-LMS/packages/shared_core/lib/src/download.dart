@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
 
@@ -51,6 +52,11 @@ class Download extends Equatable {
   Map<String, dynamic> toJson() => _$DownloadToJson(this);
 
   static String _statusToJson(DownloadStatus s) => s.toJson();
+
+  bool get localFileExists {
+    if (localFilePath == null || localFilePath!.isEmpty) return false;
+    return File(localFilePath!).existsSync();
+  }
 
   static const String createTableSQL = '''
     CREATE TABLE IF NOT EXISTS downloads (

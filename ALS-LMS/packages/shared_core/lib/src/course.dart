@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
+import 'enums.dart';
 
 part 'course.g.dart';
 
@@ -14,6 +15,12 @@ class Course extends Equatable {
   final String? teacherId;
   @JsonKey(name: 'als_center_id')
   final String? alsCenterId;
+  @JsonKey(
+    name: 'strand',
+    fromJson: AlsStrand.fromJson,
+    toJson: _strandToJson,
+  )
+  final AlsStrand strand;
   @JsonKey(name: 'course_pin')
   final String? coursePin;
   @JsonKey(name: 'qr_code_url')
@@ -40,6 +47,7 @@ class Course extends Equatable {
     this.subjectId,
     this.teacherId,
     this.alsCenterId,
+    this.strand = AlsStrand.communicationSkills,
     this.coursePin,
     this.qrCodeUrl,
     this.startDate,
@@ -54,6 +62,8 @@ class Course extends Equatable {
   factory Course.fromJson(Map<String, dynamic> json) => _$CourseFromJson(json);
   Map<String, dynamic> toJson() => _$CourseToJson(this);
 
+  static String _strandToJson(AlsStrand s) => s.toJson();
+
   static const String createTableSQL = '''
     CREATE TABLE IF NOT EXISTS courses (
       id TEXT PRIMARY KEY,
@@ -62,6 +72,7 @@ class Course extends Equatable {
       subject_id TEXT,
       teacher_id TEXT,
       als_center_id TEXT,
+      strand TEXT,
       course_pin TEXT UNIQUE,
       qr_code_url TEXT,
       start_date TEXT,
@@ -81,6 +92,7 @@ class Course extends Equatable {
         'subject_id': subjectId,
         'teacher_id': teacherId,
         'als_center_id': alsCenterId,
+        'strand': strand.toJson(),
         'course_pin': coursePin,
         'qr_code_url': qrCodeUrl,
         'start_date': startDate?.toIso8601String(),
@@ -99,6 +111,7 @@ class Course extends Equatable {
         subjectId: map['subject_id'] as String?,
         teacherId: map['teacher_id'] as String?,
         alsCenterId: map['als_center_id'] as String?,
+        strand: AlsStrand.fromJson(map['strand'] as String? ?? ''),
         coursePin: map['course_pin'] as String?,
         qrCodeUrl: map['qr_code_url'] as String?,
         startDate: map['start_date'] != null ? DateTime.parse(map['start_date'] as String) : null,
@@ -111,5 +124,5 @@ class Course extends Equatable {
       );
 
   @override
-  List<Object?> get props => [id, title, teacherId, alsCenterId, coursePin];
+  List<Object?> get props => [id, title, teacherId, alsCenterId, strand, coursePin];
 }

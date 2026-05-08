@@ -12,7 +12,9 @@ Lesson _$LessonFromJson(Map<String, dynamic> json) => Lesson(
   moduleId: json['module_id'] as String?,
   title: json['title'] as String,
   contentJson: json['content_json'] as Map<String, dynamic>?,
-  contentType: json['content_type'] as String? ?? 'text',
+  contentType: json['content_type'] == null
+      ? LessonContentType.text
+      : LessonContentType.fromJson(json['content_type'] as String),
   orderIndex: (json['order_index'] as num?)?.toInt() ?? 0,
   createdAt: json['created_at'] == null
       ? null
@@ -25,7 +27,7 @@ Map<String, dynamic> _$LessonToJson(Lesson instance) => <String, dynamic>{
   'module_id': instance.moduleId,
   'title': instance.title,
   'content_json': instance.contentJson,
-  'content_type': instance.contentType,
+  'content_type': Lesson._typeToJson(instance.contentType),
   'order_index': instance.orderIndex,
   'created_at': instance.createdAt?.toIso8601String(),
 };

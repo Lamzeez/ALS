@@ -4,7 +4,9 @@ enum UserRole {
   student,
   teacher,
   centerAdmin,
+  schoolAdmin, // Added for compatibility
   systemAdmin,
+  devAdmin,    // Added for compatibility
   @Deprecated('Use systemAdmin instead')
   admin;
 
@@ -17,9 +19,13 @@ enum UserRole {
         return 'teacher';
       case UserRole.centerAdmin:
         return 'center_admin';
+      case UserRole.schoolAdmin:
+        return 'school_admin';
       case UserRole.systemAdmin:
       case UserRole.admin:
         return 'system_admin';
+      case UserRole.devAdmin:
+        return 'dev_admin';
     }
   }
 
@@ -30,12 +36,14 @@ enum UserRole {
       case 'teacher':
         return UserRole.teacher;
       case 'center_admin':
-      case 'school_admin': // Fallback for migration
         return UserRole.centerAdmin;
+      case 'school_admin':
+        return UserRole.schoolAdmin;
       case 'system_admin':
-      case 'dev_admin': // Fallback for migration
       case 'admin':
         return UserRole.systemAdmin;
+      case 'dev_admin':
+        return UserRole.devAdmin;
       default:
         return UserRole.student;
     }

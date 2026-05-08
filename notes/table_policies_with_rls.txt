@@ -1,14 +1,17 @@
 TABLE NAMES
 -----------
+als_center_registrations
+als_centers
 announcement_comments
 announcements
 audit_logs
+center_subjects
 center_teachers
+certificates
 course_enrollments
 courses
 districts (UNRESTRICTED)
 downloads
-learning_centers (UNRESTRICTED)
 lessons
 module_progress
 modules
@@ -21,8 +24,14 @@ students
 system_settings
 teachers
 
+
 RLS POLICIES
 ------------
+TABLE: als_center_registrations
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+registrations_admin_all        | ALL 	 | authenticated
+registrations_public_insert    | INSERT  | public
 
 TABLE: announcement_comments
 NAME                           | COMMAND | APPLIED TO
@@ -42,6 +51,12 @@ NAME                           | COMMAND | APPLIED TO
 -------------------------------|---------|-----------
 audit_logs_insert_policy       | INSERT  | public
 audit_logs_select_policy       | SELECT  | public
+
+TABLE: center_subjects
+NAME                           | COMMAND | APPLIED TO
+-------------------------------|---------|-----------
+center_subjects_admin_all      | ALL     | public
+center_subjects_read	       | SELECT  | public
 
 TABLE: center_teachers
 NAME                           | COMMAND | APPLIED TO

@@ -18,6 +18,12 @@ CourseEnrollment _$CourseEnrollmentFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['completed_at'] as String),
       isActive: json['is_active'] as bool? ?? true,
+      status:
+          $enumDecodeNullable(_$EnrollmentStatusEnumMap, json['status']) ??
+          EnrollmentStatus.active,
+      course: json['course'] == null
+          ? null
+          : Course.fromJson(json['course'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$CourseEnrollmentToJson(CourseEnrollment instance) =>
@@ -28,4 +34,14 @@ Map<String, dynamic> _$CourseEnrollmentToJson(CourseEnrollment instance) =>
       'enrolled_at': instance.enrolledAt?.toIso8601String(),
       'completed_at': instance.completedAt?.toIso8601String(),
       'is_active': instance.isActive,
+      'status': instance.status,
+      'course': instance.course,
     };
+
+const _$EnrollmentStatusEnumMap = {
+  EnrollmentStatus.active: 'active',
+  EnrollmentStatus.inactive: 'inactive',
+  EnrollmentStatus.withdrawn: 'withdrawn',
+  EnrollmentStatus.completed: 'completed',
+  EnrollmentStatus.dropped: 'dropped',
+};

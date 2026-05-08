@@ -13,6 +13,9 @@ Course _$CourseFromJson(Map<String, dynamic> json) => Course(
   subjectId: json['subject_id'] as String?,
   teacherId: json['teacher_id'] as String?,
   alsCenterId: json['als_center_id'] as String?,
+  strand: json['strand'] == null
+      ? AlsStrand.communicationSkills
+      : AlsStrand.fromJson(json['strand'] as String),
   coursePin: json['course_pin'] as String?,
   qrCodeUrl: json['qr_code_url'] as String?,
   startDate: json['start_date'] == null
@@ -39,6 +42,7 @@ Map<String, dynamic> _$CourseToJson(Course instance) => <String, dynamic>{
   'subject_id': instance.subjectId,
   'teacher_id': instance.teacherId,
   'als_center_id': instance.alsCenterId,
+  'strand': Course._strandToJson(instance.strand),
   'course_pin': instance.coursePin,
   'qr_code_url': instance.qrCodeUrl,
   'start_date': instance.startDate?.toIso8601String(),

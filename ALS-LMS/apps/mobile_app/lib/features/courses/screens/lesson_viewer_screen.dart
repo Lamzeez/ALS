@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
@@ -30,6 +31,7 @@ class LessonViewerScreen extends StatefulWidget {
 
 class _LessonViewerScreenState extends State<LessonViewerScreen> {
   final _courseService = CourseService();
+  final _downloadsService = DownloadsService();
   final _offlineSync = OfflineSyncService.instance;
   final _progressRepo = ProgressRepository();
 
@@ -39,6 +41,7 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
 
   List<LessonMedia> _media = [];
   Quiz? _quiz;
+  Download? _downloadRecord;
   bool _isLoadingMedia = true;
   bool _isLoadingQuiz = true;
   bool _isOnline = true;
@@ -62,6 +65,7 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
       _loadMedia(),
       _loadQuiz(),
       _loadProgress(),
+      _checkOfflineStatus(),
     ]);
 
     if (widget.lesson.contentType == LessonContentType.video && _media.isNotEmpty) {
@@ -69,16 +73,31 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
         (m) => m.fileType == MediaFileType.video,
         orElse: () => _media.first,
       );
-      if (videoMedia.storageUrl != null && videoMedia.storageUrl!.isNotEmpty) {
-        await _initializeVideoPlayer(videoMedia.storageUrl!);
+      
+      // Use local file if downloaded, otherwise network
+      if (_downloadRecord != null && _downloadRecord!.localFileExists) {
+        await _initializeVideoPlayer(_downloadRecord!.localFilePath!, isLocal: true);
+      } else if (videoMedia.storageUrl != null && videoMedia.storageUrl!.isNotEmpty) {
+        await _initializeVideoPlayer(videoMedia.storageUrl!, isLocal: false);
       }
     }
   }
 
-  Future<void> _initializeVideoPlayer(String videoUrl) async {
+  Future<void> _checkOfflineStatus() async {
+    final studentId = AuthService().currentUser?.id;
+    if (studentId == null) return;
+    _downloadRecord = await _downloadsService.getDownload(studentId, widget.lesson.id);
+  }
+
+  Future<void> _initializeVideoPlayer(String path, {required bool isLocal}) async {
     setState(() => _isVideoLoading = true);
     try {
-      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+      if (isLocal) {
+        _videoPlayerController = VideoPlayerController.file(File(path));
+      } else {
+        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(path));
+      }
+      
       await _videoPlayerController!.initialize();
 
       _chewieController = ChewieController(
@@ -280,6 +299,20 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
 
   Widget _buildPdfViewer() {
     final pdfMedia = _media.firstWhere((m) => m.fileType == MediaFileType.pdf, orElse: () => _media.first);
+    
+    // Check for local file first
+    if (_downloadRecord != null && _downloadRecord!.localFileExists && _downloadRecord!.status == DownloadStatus.completed) {
+      return Column(
+        children: [
+          SizedBox(
+            height: 500,
+            child: SfPdfViewer.file(File(_downloadRecord!.localFilePath!)),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+
     if (pdfMedia.storageUrl == null) return const SizedBox.shrink();
 
     return Column(

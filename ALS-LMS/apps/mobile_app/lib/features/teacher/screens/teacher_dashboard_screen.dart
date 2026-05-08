@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_core/shared_core.dart';
 import 'package:backend_services/backend_services.dart';
 import 'package:shared_ui/shared_ui.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../auth/bloc/auth_bloc.dart';
 import '../../student/dashboard/screens/settings_screen.dart';
@@ -97,35 +98,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             initialData: context.read<ConnectivityService>().isOnline,
             builder: (_, snapshot) {
               final isOnline = snapshot.data ?? false;
-              return Container(
-                margin: const EdgeInsets.only(right: 16),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (isOnline ? AlsColors.online : AlsColors.offline)
-                      .withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: isOnline ? AlsColors.online : AlsColors.offline,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isOnline ? 'Online' : 'Offline',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
+              return Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: AlsStatusBadge(
+                  label: isOnline ? 'Online' : 'Offline',
+                  isOnline: isOnline,
                 ),
               );
             },
@@ -172,6 +149,206 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             label: 'Profile',
           ),
         ],
+      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: _showCreateCourseSheet,
+              icon: const Icon(Icons.add_task_rounded),
+              label: const Text('New Course'),
+              backgroundColor: AlsColors.primary,
+              foregroundColor: Colors.white,
+            )
+          : null,
+    );
+  }
+
+  void _showCreateCourseSheet() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return;
+    
+    final profile = authState.profile;
+    if (profile?.alsCenterId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: No ALS Center assigned to your profile')),
+      );
+      return;
+    }
+
+    // Pre-fetch subjects
+    List<CenterSubject> subjects = [];
+    try {
+      subjects = await _courseService.getCenterSubjects(profile!.alsCenterId!);
+    } catch (e) {
+      debugPrint('Error fetching subjects: $e');
+    }
+
+    if (subjects.isEmpty) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('No Subjects Available'),
+            content: const Text('The center admin hasn\'t defined any subjects yet. Please contact your administrator.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    CenterSubject? selectedSubject;
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(ctx).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          padding: EdgeInsets.fromLTRB(24, 20, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AlsColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text('Create New Course', 
+                  style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Text('Fill in the details to start a new learning path.', 
+                  style: TextStyle(color: AlsColors.textSecondary)),
+              const SizedBox(height: 32),
+              
+              // Subject Selection
+              const Text('Select Subject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AlsColors.divider),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<CenterSubject>(
+                    isExpanded: true,
+                    value: selectedSubject,
+                    hint: const Text('Choose from center subjects'),
+                    items: subjects.map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text('${s.subjectName} (${s.subjectCode})'),
+                    )).toList(),
+                    onChanged: (v) => setSheetState(() => selectedSubject = v),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Course Title', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: titleCtrl,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Basic Math for Beginners',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  contentPadding: const EdgeInsets.all(18),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: descCtrl,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'What will students learn in this course?',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  contentPadding: const EdgeInsets.all(18),
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton(
+                  onPressed: isSaving ? null : () async {
+                    if (titleCtrl.text.isEmpty || selectedSubject == null) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(content: Text('Please provide a title and select a subject')),
+                      );
+                      return;
+                    }
+
+                    setSheetState(() => isSaving = true);
+                    try {
+                      // Generate PIN and create course
+                      final pin = await _courseService.generateCoursePIN();
+                      await _courseService.saveCourse(Course(
+                        id: Uuid().v4(),
+                        title: titleCtrl.text.trim(),
+                        description: descCtrl.text.trim(),
+                        subjectId: selectedSubject!.id,
+                        teacherId: profile!.id,
+                        alsCenterId: profile.alsCenterId,
+                        strand: selectedSubject!.strand,
+                        coursePin: pin,
+                        isActive: true,
+                        isPublished: true,
+                      ));
+                      
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      _loadCourses();
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Course Created! PIN: $pin'),
+                            backgroundColor: AlsColors.success,
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text('Error: $e'), backgroundColor: AlsColors.error),
+                        );
+                      }
+                    } finally {
+                      setSheetState(() => isSaving = false);
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: isSaving 
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Create Course', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -221,51 +398,63 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final strandColor = _getStrandColor(strandName);
     final isSelected = _selectedCourse?.id == course.id;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: isSelected
-            ? BorderSide(color: AlsColors.primary, width: 2)
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => setState(() => _selectedCourse = course),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 6,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: strandColor,
-                  borderRadius: BorderRadius.circular(3),
+    return AlsCard(
+      padding: EdgeInsets.zero,
+      borderColor: isSelected ? AlsColors.primary : null,
+      onTap: () => setState(() => _selectedCourse = course),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              decoration: BoxDecoration(
+                color: strandColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    Text(_formatStrand(strandName),
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: AlsColors.textSecondary)),
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatStrand(strandName),
+                      style: TextStyle(
+                        color: AlsColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              if (isSelected)
-                Icon(Icons.check_circle, color: AlsColors.primary),
-            ],
-          ),
+            ),
+            if (isSelected)
+              Padding(
+                padding: const EdgeInsets.only(right: 20),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AlsColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.check_circle_rounded, color: AlsColors.primary, size: 24),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -363,10 +552,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  profile?.role == UserRole.schoolAdmin
+                  profile?.role == UserRole.centerAdmin
                       ? 'Center Admin'
-                      : profile?.role == UserRole.devAdmin
-                          ? 'Dev Admin'
+                      : profile?.role == UserRole.systemAdmin
+                          ? 'System Admin'
                           : 'Teacher',
                   style: TextStyle(
                       color: AlsColors.accentDark,

@@ -157,42 +157,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         actions: [
+          // Downloaded content shortcut
+          IconButton(
+            icon: const Icon(Icons.download_for_offline_outlined),
+            onPressed: () => _showDownloadedContentSheet(),
+            tooltip: 'Offline Content',
+          ),
           // Online/Offline indicator
           StreamBuilder<bool>(
             stream: connectivity.onConnectivityChanged,
             initialData: connectivity.isOnline,
             builder: (context, snapshot) {
               final isOnline = snapshot.data ?? false;
-              return Container(
-                margin: const EdgeInsets.only(right: 16),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isOnline
-                      ? AlsColors.online.withValues(alpha: 0.2)
-                      : AlsColors.offline.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: isOnline ? AlsColors.online : AlsColors.offline,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isOnline ? 'Online' : 'Offline',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
+              return Padding(
+                padding: const EdgeInsets.only(right: 16, left: 8),
+                child: AlsStatusBadge(
+                  label: isOnline ? 'Online' : 'Offline',
+                  isOnline: isOnline,
                 ),
               );
             },
@@ -265,27 +246,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // Greeting
-          BlocBuilder<AuthBloc, AuthState>(
-            builder: (context, state) {
-              final name = state is AuthAuthenticated
-                  ? state.profile?.fullName ?? 'Student'
-                  : 'Student';
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Magandang araw,',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AlsColors.textSecondary,
-                        ),
-                  ),
-                  Text(name, style: Theme.of(context).textTheme.headlineLarge),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 24),
+          // Greeting ... (previous code)
+          
+          // Continue Learning Shortcut
+          if (!_isLoadingCourses && _enrolledCourses.isNotEmpty) ...[
+            _buildContinueLearningSection(),
+            const SizedBox(height: 32),
+          ],
 
           // Course count chip
           if (!_isLoadingCourses && _enrolledCourses.isNotEmpty)
@@ -293,20 +260,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               margin: const EdgeInsets.only(bottom: 16),
               child: Row(
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AlsColors.primarySurface,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${_enrolledCourses.length} Course${_enrolledCourses.length == 1 ? '' : 's'} Enrolled',
-                      style: TextStyle(
-                        color: AlsColors.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
+                  const Icon(Icons.sort_rounded, size: 18, color: AlsColors.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Your Enrolled Courses (${_enrolledCourses.length})',
+                    style: TextStyle(
+                      color: AlsColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
                 ],
@@ -330,6 +291,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return _buildCourseCard(course, enrollment);
             }),
         ],
+      ),
+    );
+  }
+
+  Widget _buildContinueLearningSection() {
+    // Find the most recently started module
+    ModuleProgress? latestProgress;
+    DateTime? latestTime;
+
+    for (final progressList in _courseProgress.values) {
+      for (final p in progressList) {
+        if (p.startedAt != null && (latestTime == null || p.startedAt!.isAfter(latestTime))) {
+          latestTime = p.startedAt;
+          latestProgress = p;
+        }
+      }
+    }
+
+    if (latestProgress == null) {
+      // If none started, just pick the first enrolled course
+      if (_enrolledCourses.isEmpty) return const SizedBox.shrink();
+      final firstCourse = _enrolledCourses.first.course;
+      if (firstCourse == null) return const SizedBox.shrink();
+      
+      return _buildResumeCard(
+        title: 'Start your journey',
+        subtitle: firstCourse.title,
+        courseId: firstCourse.id,
+        progress: 0,
+      );
+    }
+
+    final course = _enrolledCourses.firstWhere((e) => e.courseId == latestProgress!.courseId).course;
+    if (course == null) return const SizedBox.shrink();
+
+    return _buildResumeCard(
+      title: 'Continue Learning',
+      subtitle: '${course.title}: ${latestProgress.moduleTitle ?? 'Current Module'}',
+      courseId: course.id,
+      progress: latestProgress.lessonsViewed / (latestProgress.totalLessons > 0 ? latestProgress.totalLessons : 1),
+    );
+  }
+
+  Widget _buildResumeCard({
+    required String title,
+    required String subtitle,
+    required String courseId,
+    required double progress,
+  }) {
+    return AlsCard(
+      padding: EdgeInsets.zero,
+      gradient: const LinearGradient(
+        colors: [AlsColors.accent, Color(0xFFF59E0B)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CourseDetailScreen(
+              courseId: courseId,
+              courseTitle: subtitle.split(':')[0],
+            ),
+          ),
+        ).then((_) => _loadEnrolledCourses());
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white,
+                minHeight: 6,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -375,126 +452,118 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final description = course.description ?? '';
     final strandStr = course.strand.name;
     final strandColor = _getStrandColor(strandStr);
-    final isSelected = false; // Not used in this screen but kept for consistency
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 2,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CourseDetailScreen(
-                courseId: course.id,
-                courseTitle: title,
-              ),
+    return AlsCard(
+      padding: EdgeInsets.zero,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CourseDetailScreen(
+              courseId: course.id,
+              courseTitle: title,
             ),
-          ).then((_) => _loadEnrolledCourses());
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Strand color bar
-            Container(
-              height: 6,
-              decoration: BoxDecoration(
-                color: strandColor,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
+          ),
+        ).then((_) => _loadEnrolledCourses());
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Strand color bar
+          Container(
+            height: 8,
+            decoration: BoxDecoration(
+              color: strandColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: strandColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child:
-                            Icon(Icons.menu_book, color: strandColor, size: 24),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: strandColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                      child: Icon(Icons.auto_stories_rounded, color: strandColor, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                              height: 1.2,
                             ),
-                            if (description.isNotEmpty)
-                              Text(
-                                description,
-                                style: Theme.of(context).textTheme.bodySmall,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right, color: AlsColors.textHint),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Strand chip + status
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: strandColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _formatStrand(strandStr),
-                          style: TextStyle(
-                            color: strandColor,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AlsColors.secondarySurface,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          enrollment.status.name.toUpperCase(),
-                          style: TextStyle(
-                            color: AlsColors.secondary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatStrand(strandStr),
+                            style: TextStyle(
+                              color: strandColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              letterSpacing: 0.5,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: AlsColors.textHint.withValues(alpha: 0.5)),
+                  ],
+                ),
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AlsColors.textSecondary,
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ),
+                const SizedBox(height: 20),
+                // Status and Action
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AlsTag(
+                      label: enrollment.status.name.toUpperCase(),
+                      color: enrollment.status == EnrollmentStatus.active 
+                          ? AlsColors.success 
+                          : AlsColors.warning,
+                      icon: enrollment.status == EnrollmentStatus.active 
+                          ? Icons.play_circle_fill_rounded 
+                          : Icons.pause_circle_filled_rounded,
+                    ),
+                    Text(
+                      'Continue Learning',
+                      style: TextStyle(
+                        color: AlsColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

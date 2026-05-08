@@ -135,10 +135,10 @@ class _CenterDashboardState extends State<CenterDashboard> {
     }
     setState(() => _isLoading = true);
     try {
-      final client = SupabaseConfig.client;
-
+      final courseService = CourseService();
+      
       // 1. Center Profiles
-      final centerProfiles = await client
+      final centerProfiles = await SupabaseConfig.client
           .from('profiles')
           .select('id, role, full_name, email, is_active, created_at')
           .eq('als_center_id', _myCenterId!)
@@ -150,23 +150,39 @@ class _CenterDashboardState extends State<CenterDashboard> {
       _totalTeachers = profilesList.where((u) => u['role'] == 'teacher').length;
 
       // 2. Center Courses
-      final centerCourses = await client
-          .from('courses')
-          .select('*, profiles:teacher_id(full_name)')
-          .eq('als_center_id', _myCenterId!);
-      _courses = List<Map<String, dynamic>>.from(centerCourses);
+      final courses = await courseService.getCoursesByCenter(_myCenterId!);
+      
+      // Since we already have the courses from the service (which filters by teachers),
+      // we just need to make sure we have teacher names for the UI.
+      // We can fetch teacher names for the courses we found.
+      final teacherIds = courses.map((c) => c.teacherId).whereType<String>().toSet().toList();
+      
+      List<Map<String, dynamic>> coursesWithTeachers = [];
+      if (teacherIds.isNotEmpty) {
+        final teacherProfiles = await SupabaseConfig.client
+            .from('profiles')
+            .select('id, full_name')
+            .inFilter('id', teacherIds);
+        
+        final teacherMap = {for (var p in teacherProfiles) p['id']: p['full_name']};
+        
+        coursesWithTeachers = courses.map((c) {
+          final json = c.toJson();
+          json['profiles'] = {'full_name': teacherMap[c.teacherId] ?? 'Unknown'};
+          return json;
+        }).toList();
+      } else {
+        coursesWithTeachers = courses.map((c) => c.toJson()).toList();
+      }
+      
+      _courses = coursesWithTeachers;
       _totalCourses = _courses.length;
 
       // 3. Offered Subjects
-      final subjects = await client
-          .from('center_subjects')
-          .select()
-          .eq('als_center_id', _myCenterId!)
-          .eq('is_active', true);
-      _offeredSubjects = (subjects as List).map((s) => CenterSubject.fromJson(s)).toList();
+      _offeredSubjects = await courseService.getCenterSubjects(_myCenterId!);
 
       // 4. Pending Teachers
-      final pending = await client
+      final pending = await SupabaseConfig.client
           .from('profiles')
           .select('id, full_name, email, employee_id, created_at')
           .eq('role', 'teacher')
@@ -188,12 +204,13 @@ class _CenterDashboardState extends State<CenterDashboard> {
     _NavItem(Icons.dashboard_rounded, 'Overview'),
     _NavItem(Icons.how_to_reg_rounded, 'Teacher Approvals'),
     _NavItem(Icons.group_rounded, 'Teachers & Students'),
-    _NavItem(Icons.auto_stories_rounded, 'Core Academic Subjects'),
+    _NavItem(Icons.auto_stories_rounded, 'Curriculum'),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
         children: [
           _buildSidebar(),
@@ -205,7 +222,7 @@ class _CenterDashboardState extends State<CenterDashboard> {
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
-                          padding: const EdgeInsets.all(32),
+                          padding: const EdgeInsets.all(40),
                           child: _buildCurrentPage(),
                         ),
                 ),
@@ -219,24 +236,28 @@ class _CenterDashboardState extends State<CenterDashboard> {
 
   Widget _buildSidebar() {
     return Container(
-      width: 280,
-      decoration: BoxDecoration(
-        color: AlsColors.primaryDark,
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
+      width: 260,
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
       ),
       child: Column(
         children: [
           _buildSidebarHeader(),
-          const SizedBox(height: 24),
-          ..._navItems.asMap().entries.map((entry) {
-            return _buildSidebarItem(
-              entry.value.icon,
-              entry.value.label,
-              _selectedNavIndex == entry.key,
-              () => setState(() => _selectedNavIndex = entry.key),
-            );
-          }),
-          const Spacer(),
+          const SizedBox(height: 32),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: _navItems.asMap().entries.map((entry) {
+                return _buildSidebarItem(
+                  entry.value.icon,
+                  entry.value.label,
+                  _selectedNavIndex == entry.key,
+                  () => setState(() => _selectedNavIndex = entry.key),
+                );
+              }).toList(),
+            ),
+          ),
           _buildRefreshButton(),
           const SizedBox(height: 24),
         ],
@@ -250,7 +271,7 @@ class _CenterDashboardState extends State<CenterDashboard> {
       case 'Overview': return _buildOverview();
       case 'Teacher Approvals': return _buildApprovals();
       case 'Teachers & Students': return _buildUserDirectory();
-      case 'Core Academic Subjects': return _buildCurriculumManagement();
+      case 'Curriculum': return _buildCurriculumManagement();
       default: return _buildOverview();
     }
   }
@@ -262,35 +283,52 @@ class _CenterDashboardState extends State<CenterDashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_myCenter != null) ...[
-          Text(
-            _myCenter!.name,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AlsColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.location_city_rounded, color: AlsColors.primary, size: 32),
+              ),
+              const SizedBox(width: 20),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _myCenter!.name,
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  Text(
+                    '${_myCenter!.region} • ${_myCenter!.address}',
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${_myCenter!.region} • ${_myCenter!.address}',
-            style: TextStyle(color: AlsColors.textSecondary, fontSize: 14),
-          ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 48),
         ],
 
         Row(
           children: [
-            _buildMetricCard('Teachers', '$_totalTeachers', Icons.person, AlsColors.strandMath),
-            _buildMetricCard('Students', '$_totalStudents', Icons.school, AlsColors.strandCommunication),
-            _buildMetricCard('Courses', '$_totalCourses', Icons.menu_book, AlsColors.secondary),
-            _buildMetricCard('Enrollments', '$_totalEnrollments', Icons.how_to_reg, AlsColors.strandSociety),
+            _buildMetricCard('Teachers', '$_totalTeachers', Icons.person_rounded, const Color(0xFF6366F1)),
+            _buildMetricCard('Students', '$_totalStudents', Icons.school_rounded, const Color(0xFF10B981)),
+            _buildMetricCard('Courses', '$_totalCourses', Icons.auto_stories_rounded, const Color(0xFFF59E0B)),
+            _buildMetricCard('Subjects', '${_offeredSubjects.length}', Icons.category_rounded, const Color(0xFF3B82F6)),
           ],
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 48),
         
-        Text('Quick Actions', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
+        const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 20),
         Row(
           children: [
             _buildQuickAction('Review Teacher Requests', Icons.pending_actions_rounded, AlsColors.warning, () => setState(() => _selectedNavIndex = 1)),
-            const SizedBox(width: 16),
-            _buildQuickAction('Update Offered Subjects', Icons.settings_suggest_rounded, AlsColors.primary, () => setState(() => _selectedNavIndex = 3)),
+            const SizedBox(width: 20),
+            _buildQuickAction('Manage Curriculum', Icons.settings_suggest_rounded, AlsColors.primary, () => setState(() => _selectedNavIndex = 3)),
           ],
         ),
       ],
@@ -301,28 +339,21 @@ class _CenterDashboardState extends State<CenterDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Core Academic Subjects', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                Text('Manage subjects offered by your center and monitor active courses.', style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-            ElevatedButton.icon(
-              onPressed: () => _showManageSubjectsDialog(), 
-              icon: const Icon(Icons.edit_note_rounded), 
-              label: const Text('Edit Offered Subjects'),
-              style: ElevatedButton.styleFrom(backgroundColor: AlsColors.primary, foregroundColor: Colors.white),
-            ),
-          ],
+        const Text('Curriculum Management', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const Text('Manage authorized subjects and monitor teacher-led courses.', style: TextStyle(color: Color(0xFF64748B))),
+        const SizedBox(height: 40),
+
+        SubjectManagementView(
+          alsCenterId: _myCenterId ?? '',
+          onSubjectsChanged: _loadData,
         ),
-        const SizedBox(height: 32),
+        
+        const SizedBox(height: 56),
+        const Text('Active Courses by Subject', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 20),
 
         if (_offeredSubjects.isEmpty) 
-          _buildEmptyState('No subjects have been authorized for this center yet.')
+          _buildEmptyState('No subjects defined yet. Add subjects above to see course distribution.')
         else 
           ListView.builder(
             shrinkWrap: true,
@@ -333,11 +364,11 @@ class _CenterDashboardState extends State<CenterDashboard> {
               final subjectCourses = _courses.where((c) => c['subject_id'] == subject.id).toList();
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 24),
+                margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AlsColors.divider),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: ExpansionTile(
                   shape: const RoundedRectangleBorder(side: BorderSide.none),
@@ -345,22 +376,22 @@ class _CenterDashboardState extends State<CenterDashboard> {
                     backgroundColor: AlsColors.primary.withValues(alpha: 0.1),
                     child: Text(subject.subjectCode.substring(0, 1), style: const TextStyle(color: AlsColors.primary, fontWeight: FontWeight.bold)),
                   ),
-                  title: Text(subject.subjectName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  subtitle: Text('${subject.subjectCode} • ${subject.gradeLevel ?? 'All Levels'} • ${subjectCourses.length} Active Courses'),
+                  title: Text(subject.subjectName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B))),
+                  subtitle: Text('${subjectCourses.length} Active Courses'),
                   children: [
                     if (subjectCourses.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(24.0),
-                        child: Text('No courses created by teachers for this subject yet.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                        child: Text('No courses created for this subject yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
                       )
                     else
                       Column(
                         children: subjectCourses.map((course) => ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                          leading: const Icon(Icons.class_outlined, size: 20),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          leading: const Icon(Icons.class_rounded, size: 20, color: Color(0xFF64748B)),
                           title: Text(course['title'] ?? 'Untitled Course', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                           subtitle: Text('Teacher: ${course['profiles']?['full_name'] ?? 'Unknown'} • Status: ${course['is_published'] == true ? 'Published' : 'Draft'}'),
-                          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)),
                         )).toList(),
                       ),
                   ],
@@ -370,19 +401,6 @@ class _CenterDashboardState extends State<CenterDashboard> {
           ),
       ],
     );
-  }
-
-  void _showManageSubjectsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800, maxHeight: 800),
-          child: SubjectManagementPage(alsCenterId: _myCenterId ?? ''),
-        ),
-      ),
-    ).then((_) => _loadData());
   }
 
   Widget _buildUserDirectory() {

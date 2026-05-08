@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
+import 'enums.dart';
 
 part 'lesson.g.dart';
 
@@ -13,8 +14,12 @@ class Lesson extends Equatable {
   final String title;
   @JsonKey(name: 'content_json')
   final Map<String, dynamic>? contentJson;
-  @JsonKey(name: 'content_type')
-  final String contentType;
+  @JsonKey(
+    name: 'content_type',
+    fromJson: LessonContentType.fromJson,
+    toJson: _typeToJson,
+  )
+  final LessonContentType contentType;
   @JsonKey(name: 'order_index')
   final int orderIndex;
   @JsonKey(name: 'created_at')
@@ -26,13 +31,15 @@ class Lesson extends Equatable {
     this.moduleId,
     required this.title,
     this.contentJson,
-    this.contentType = 'text',
+    this.contentType = LessonContentType.text,
     this.orderIndex = 0,
     this.createdAt,
   });
 
   factory Lesson.fromJson(Map<String, dynamic> json) => _$LessonFromJson(json);
   Map<String, dynamic> toJson() => _$LessonToJson(this);
+
+  static String _typeToJson(LessonContentType t) => t.toJson();
 
   static const String createTableSQL = '''
     CREATE TABLE IF NOT EXISTS lessons (
@@ -48,5 +55,5 @@ class Lesson extends Equatable {
   ''';
 
   @override
-  List<Object?> get props => [id, courseId, moduleId, title, orderIndex];
+  List<Object?> get props => [id, courseId, moduleId, title, orderIndex, contentType];
 }

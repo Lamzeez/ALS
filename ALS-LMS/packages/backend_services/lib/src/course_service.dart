@@ -45,10 +45,22 @@ class CourseService {
   Future<List<Course>> getCoursesByCenter(String alsCenterId) async {
     return SupabaseConfig.withRetry(
       () async {
+        // Since als_center_id doesn't exist in courses table, 
+        // we filter by teachers assigned to this center.
+        final teacherRows = await SupabaseConfig.client
+            .from('profiles')
+            .select('id')
+            .eq('als_center_id', alsCenterId)
+            .eq('role', 'teacher');
+        
+        final teacherIds = (teacherRows as List).map((r) => r['id']).toList();
+        
+        if (teacherIds.isEmpty) return [];
+
         final rows = await SupabaseConfig.client
             .from('courses')
             .select('*')
-            .eq('als_center_id', alsCenterId)
+            .inFilter('teacher_id', teacherIds)
             .eq('is_active', true);
 
         return (rows as List).map((r) => Course.fromJson(r)).toList();

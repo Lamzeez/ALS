@@ -13,6 +13,9 @@ CenterSubject _$CenterSubjectFromJson(Map<String, dynamic> json) =>
       subjectName: json['subject_name'] as String,
       subjectCode: json['subject_code'] as String,
       gradeLevel: json['grade_level'] as String?,
+      strand: json['strand'] == null
+          ? AlsStrand.communicationSkills
+          : AlsStrand.fromJson(json['strand'] as String),
       isActive: json['is_active'] as bool? ?? true,
       createdAt: json['created_at'] == null
           ? null
@@ -26,6 +29,7 @@ Map<String, dynamic> _$CenterSubjectToJson(CenterSubject instance) =>
       'subject_name': instance.subjectName,
       'subject_code': instance.subjectCode,
       'grade_level': instance.gradeLevel,
+      'strand': CenterSubject._strandToJson(instance.strand),
       'is_active': instance.isActive,
       'created_at': instance.createdAt?.toIso8601String(),
     };

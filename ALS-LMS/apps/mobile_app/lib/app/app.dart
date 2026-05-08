@@ -61,13 +61,16 @@ class _AlsStudentAppState extends State<AlsStudentApp> {
           create: (_) => SystemService(),
         ),
       ],
-      child: MaterialApp.router(
-        title: '9Class',
-        debugShowCheckedModeBanner: false,
-        theme: AlsTheme.lightTheme,
-        darkTheme: AlsTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        routerConfig: AlsRouter.createRouter(_authBloc),
+      child: BlocProvider<AuthBloc>.value(
+        value: _authBloc,
+        child: MaterialApp.router(
+          title: '9Class',
+          debugShowCheckedModeBanner: false,
+          theme: AlsTheme.lightTheme,
+          darkTheme: AlsTheme.darkTheme,
+          themeMode: ThemeMode.system,
+          routerConfig: AlsRouter.createRouter(_authBloc),
+        ),
       ),    );
   }
 }

@@ -277,16 +277,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           else
             ...lessons.map((lesson) {
               final lessonTitle = lesson.title;
-              final contentType = lesson.contentType.name;
+              final contentType = lesson.contentType;
               IconData typeIcon;
               switch (contentType) {
-                case 'video':
+                case LessonContentType.video:
                   typeIcon = Icons.play_circle_outline;
                   break;
-                case 'pdf':
+                case LessonContentType.pdf:
                   typeIcon = Icons.picture_as_pdf;
                   break;
-                case 'interactive':
+                case LessonContentType.interactive:
                   typeIcon = Icons.touch_app;
                   break;
                 default:
@@ -297,7 +297,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 leading: Icon(typeIcon, color: AlsColors.primary),
                 title: Text(lessonTitle),
                 subtitle: Text(
-                  contentType.replaceAll('_', ' '),
+                  contentType.toJson().replaceAll('_', ' '),
                   style: TextStyle(fontSize: 11, color: AlsColors.textSecondary),
                 ),
                 trailing: const Icon(Icons.chevron_right),
